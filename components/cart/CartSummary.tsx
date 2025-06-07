@@ -3,9 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import Script from "next/script";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import Script from "next/script";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -17,24 +16,16 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/context/CartContext";
+import { Loader2 } from "lucide-react";
 
-// Define PayHero on the window object for TypeScript
+// PayHero SDK type declaration
 interface Window {
-  PayHero?: {
+  PayHero: {
     init: (config: any) => void;
   };
-  location: Location;
-  addEventListener: (
-    type: string,
-    listener: (event: MessageEvent) => void
-  ) => void;
-  removeEventListener: (
-    type: string,
-    listener: (event: MessageEvent) => void
-  ) => void;
 }
-declare const window: Window;
-declare const PayHero: NonNullable<Window["PayHero"]>;
+
+declare const PayHero: Window["PayHero"];
 
 export function CartSummary() {
   const { totalPrice, totalItems, cartItems, clearCart } = useCart();
@@ -46,57 +37,54 @@ export function CartSummary() {
     id: string;
     customId: string;
   } | null>(null);
-
-  // Ref to track if the PayHero SDK script has loaded
   const sdkLoaded = useRef(false);
 
-  // This function initializes PayHero and programmatically clicks its button
-  const triggerPayHeroPayment = (order: { id: string; customId: string }) => {
-    if (typeof PayHero === "undefined") {
-      toast.error(
-        "Payment service is currently unavailable. Please try again later."
-      );
-      setIsProcessing(false);
-      return;
+  const handleScriptLoad = () => {
+    sdkLoaded.current = true;
+  };
+
+  const initializePayHero = (orderReference: string) => {
+    if (!sdkLoaded.current || typeof PayHero === "undefined") {
+      console.error("PayHero SDK not loaded");
+      return false;
     }
 
     PayHero.init({
       paymentUrl: process.env.NEXT_PUBLIC_PAYHERO_LIPWA_URL!,
-      containerId: "payHeroContainer", // The hidden container
+      containerId: "payHeroContainer",
       channelID: parseInt(process.env.NEXT_PUBLIC_PAYHERO_CHANNEL_ID!, 10),
       amount: totalPrice,
       phone: session?.user?.phone || "",
       name: session?.user?.name || "Valued Customer",
-      reference: order.customId,
-      buttonName: "PayHero", // This won't be visible
-      buttonColor: "#000000", // This won't be visible
-      width: "0px",
-      height: "0px",
-      successUrl: null, // We handle this manually
-      failedUrl: null, // We handle this manually
+      reference: orderReference,
+      buttonName: `Pay Now KES ${totalPrice.toFixed(2)}`,
+      buttonColor: process.env.NEXT_PUBLIC_PAYHERO_BUTTON_COLOR!,
+      width: "100%",
+      height: "48px",
+      successUrl: null,
+      failedUrl: null,
       callbackUrl: `${window.location.origin}/api/webhooks/payhero`,
     });
 
-    // Give the SDK a moment to inject the iframe button
-    setTimeout(() => {
-      const container = document.getElementById("payHeroContainer");
-      const payButton = container?.querySelector("iframe"); // PayHero injects an iframe
-
-      if (payButton) {
-        payButton.click();
-        // The payment modal is now open. We can stop our loading indicator.
-        // We will show a new one on payment success/failure.
-        setIsProcessing(false);
-      } else {
-        toast.error("Could not initiate payment. Please try again.");
-        setIsProcessing(false);
-      }
-    }, 200); // 200ms delay to be safe
+    return true;
   };
 
-  const handlePay = async (): Promise<void> => {
+  const handlePaymentSuccess = () => {
+    toast.loading("Payment received! Finalizing your order...");
+    clearCart();
+    router.push(`/order/success?orderId=${pendingOrder?.id}`);
+  };
+
+  const handlePaymentFailure = () => {
+    toast.error("Payment Failed", {
+      description: "Your payment could not be processed. Please try again.",
+    });
+    setIsProcessing(false);
+  };
+
+  const handlePayment = async () => {
     if (!session?.user) {
-      toast.error("Please sign in to proceed.");
+      toast.error("Please sign in to proceed to checkout.");
       router.push("/api/auth/signin?callbackUrl=/cart");
       return;
     }
@@ -123,72 +111,67 @@ export function CartSummary() {
         body: JSON.stringify(orderPayload),
       });
 
-      if (!res.ok) throw new Error("Could not create your order.");
+      if (!res.ok) throw new Error("Could not create an order.");
 
       const newPendingOrder = await res.json();
-      toast.dismiss();
-      toast.info("Order created. Initiating payment...");
-
-      // Store the pending order, which will be used by the useEffect to trigger payment
       setPendingOrder({
         id: newPendingOrder._id,
         customId: newPendingOrder.customId,
       });
-    } catch (error: any) {
+
       toast.dismiss();
+      toast.loading("Initializing payment...");
+
+      // Step 2: Initialize PayHero payment
+      const paymentInitialized = initializePayHero(newPendingOrder.customId);
+
+      if (!paymentInitialized) {
+        throw new Error("Failed to initialize payment system.");
+      }
+
+      toast.dismiss();
+
+      // Step 3: Trigger the PayHero button click programmatically
+      setTimeout(() => {
+        const payHeroButton = document.querySelector(
+          "#payHeroContainer button"
+        );
+        if (payHeroButton) {
+          (payHeroButton as HTMLButtonElement).click();
+        } else {
+          throw new Error("Payment button not found.");
+        }
+      }, 500);
+    } catch (error: any) {
       toast.error("Checkout Failed", { description: error.message });
       setIsProcessing(false);
     }
   };
 
-  // This effect runs when a pendingOrder is created.
-  // It waits for the SDK to be ready and then triggers the payment.
-  useEffect(() => {
-    if (pendingOrder && sdkLoaded.current) {
-      triggerPayHeroPayment(pendingOrder);
-    }
-  }, [pendingOrder]); // Dependency on pendingOrder
-
-  const handleScriptLoad = () => {
-    sdkLoaded.current = true;
-    // If an order was already created before the script finished loading, trigger payment now.
-    if (pendingOrder) {
-      triggerPayHeroPayment(pendingOrder);
-    }
-  };
-
-  // Centralized payment event handling from PayHero iframe
+  // Listen for PayHero payment messages
   useEffect(() => {
     const handlePaymentMessage = (event: MessageEvent) => {
       if (event.data.paymentSuccess) {
-        // The webhook handles the order update. We just give user feedback and redirect.
-        toast.loading("Payment received! Finalizing your order...");
-        clearCart(); // Clear the cart on the client-side
-        router.push(`/order/success?orderId=${pendingOrder?.id}`);
+        handlePaymentSuccess();
       } else if (event.data.paymentSuccess === false) {
-        toast.error("Payment Failed", {
-          description: "Your payment could not be processed. Please try again.",
-        });
-        // Reset state to allow another payment attempt for the same order
-        setPendingOrder(null);
-        setIsProcessing(false);
+        handlePaymentFailure();
       }
     };
 
     window.addEventListener("message", handlePaymentMessage);
-    return () => window.removeEventListener("message", handlePaymentMessage);
-  }, [pendingOrder, clearCart, router]);
+
+    return () => {
+      window.removeEventListener("message", handlePaymentMessage);
+    };
+  }, [pendingOrder]);
 
   return (
     <>
-      {/* Load the PayHero SDK. It will be available on the window object */}
       <Script
         src="https://applet.payherokenya.com/cdn/button_sdk.js?v=3.1"
         onLoad={handleScriptLoad}
         strategy="lazyOnload"
       />
-      {/* This is the hidden container where PayHero will inject its button */}
-      <div id="payHeroContainer" style={{ display: "none" }}></div>
 
       <Card className="rounded-2xl shadow-lg">
         <CardHeader>
@@ -213,16 +196,19 @@ export function CartSummary() {
           <Button
             size="lg"
             className="w-full rounded-xl text-lg shadow-md"
-            onClick={handlePay}
+            onClick={handlePayment}
             disabled={cartItems.length === 0 || isProcessing}
           >
             {isProcessing ? (
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
             ) : null}
-            Pay Ksh. {totalPrice.toFixed(2)}
+            Pay
           </Button>
         </CardFooter>
       </Card>
+
+      {/* Hidden PayHero container - will be triggered programmatically */}
+      <div id="payHeroContainer" className="hidden"></div>
     </>
   );
 }
