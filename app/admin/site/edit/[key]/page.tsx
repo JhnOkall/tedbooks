@@ -1,8 +1,13 @@
+/**
+ * @file This file defines the dynamic admin page for editing a specific site content block.
+ * It fetches existing content based on a URL parameter and provides a form to update it.
+ */
+
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, FormEvent } from "react";
 import {
   Card,
   CardContent,
@@ -24,23 +29,33 @@ import {
   Terminal,
   ArrowLeft,
 } from "lucide-react";
+import { toast } from "sonner";
 
+/**
+ * Type definition for the content data being edited.
+ */
 interface ContentData {
   title: string;
   content: string;
 }
 
+/**
+ * A dynamic client page for editing a site content block. The specific content
+ * to edit is determined by the `key` parameter in the URL (e.g., `/admin/content/edit/aboutPageContent`).
+ */
 export default function EditContentPage() {
-  const router = useRouter();
   const params = useParams();
-  const key = params.key as string;
+  const key = params.key as string; // The unique key from the URL path.
 
   const [contentData, setContentData] = useState<Partial<ContentData>>({});
-  const [isLoading, setIsLoading] = useState(true); // Start loading initially
-  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Manages the initial data fetching state.
+  const [isSaving, setIsSaving] = useState(false); // Manages the state during form submission.
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
+  /**
+   * Effect hook to fetch the content data from the API when the component mounts
+   * or when the `key` parameter changes.
+   */
   useEffect(() => {
     if (!key) return;
 
@@ -53,16 +68,16 @@ export default function EditContentPage() {
           const data = await res.json();
           setContentData(data);
         } else if (res.status === 404) {
-          // If the key doesn't exist, we can treat this as a creation page
+          // If content is not found, treat this as a creation form for that key.
           setContentData({ title: "", content: "" });
           setError(
-            `Content with key '${key}' not found. You can create it here.`
+            `Content with key '${key}' not found. You can create it by saving changes.`
           );
         } else {
           throw new Error("Failed to load content.");
         }
-      } catch (err) {
-        setError("An error occurred while fetching content.");
+      } catch (err: any) {
+        setError(err.message || "An error occurred while fetching content.");
       } finally {
         setIsLoading(false);
       }
@@ -71,11 +86,14 @@ export default function EditContentPage() {
     fetchContent();
   }, [key]);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  /**
+   * Handles the form submission to save the updated content.
+   * @param {FormEvent<HTMLFormElement>} event - The form submission event.
+   */
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSaving(true);
     setError(null);
-    setSuccess(null);
 
     try {
       const res = await fetch(`/api/site-content/${key}`, {
@@ -88,8 +106,7 @@ export default function EditContentPage() {
         const errorData = await res.json();
         throw new Error(errorData.message || "Failed to save content.");
       }
-
-      setSuccess("Content saved successfully!");
+      toast.success("Content saved successfully!");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -97,7 +114,10 @@ export default function EditContentPage() {
     }
   };
 
+  // Displays a loader while the initial content is being fetched.
   if (isLoading) {
+    // TODO: For a better UX, replace this generic loader with a skeleton loader
+    // that mimics the form's layout.
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -108,7 +128,7 @@ export default function EditContentPage() {
   return (
     <div className="py-6 space-y-6">
       <header>
-        <h1 className="text-3xl font-headline font-bold">
+        <h1 className="text-3xl font-bold">
           Edit Content: <code>{key}</code>
         </h1>
         <p className="text-muted-foreground">
@@ -116,30 +136,22 @@ export default function EditContentPage() {
         </p>
       </header>
 
-      <Card className="rounded-xl shadow-lg">
+      <Card className="rounded-lg shadow-md">
         <form onSubmit={handleSubmit}>
           <CardHeader>
             <CardTitle>Content Details</CardTitle>
             <CardDescription>
-              Update the information below. Markdown is supported.
+              Update the information below. Markdown is supported for the
+              content field.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* TODO: Replace these inline error/success alerts with non-blocking toast notifications. */}
             {error && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Error</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            {success && (
-              <Alert
-                variant="default"
-                className="bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700"
-              >
-                <Terminal className="h-4 w-4" />
-                <AlertTitle>Success!</AlertTitle>
-                <AlertDescription>{success}</AlertDescription>
               </Alert>
             )}
             <div className="space-y-2">
@@ -174,7 +186,7 @@ export default function EditContentPage() {
               className="rounded-lg"
             >
               <Link href="/admin/content">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Manage Content
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back
               </Link>
             </Button>
             <div className="flex space-x-3">

@@ -1,3 +1,8 @@
+/**
+ * @file This file defines the admin page for managing customer orders.
+ * It provides a table view of all orders and allows administrators to update their status.
+ */
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -29,12 +34,23 @@ import type { Order } from "@/types";
 import { Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
+// Define the type for the order status more strictly.
+type OrderStatus = "Pending" | "Completed" | "Cancelled";
+
+/**
+ * The main component for the "Manage Orders" admin page. It fetches and displays
+ * all orders and provides controls for status updates.
+ */
 export default function ManageOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // State to track which specific order is currently being updated to show a loader.
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
+  /**
+   * Effect hook to fetch all orders from the API when the component mounts.
+   */
   useEffect(() => {
     const fetchOrders = async () => {
       setIsLoading(true);
@@ -54,12 +70,20 @@ export default function ManageOrdersPage() {
     fetchOrders();
   }, []);
 
+  /**
+   * Handles the change of an order's status. It sends a PATCH request to the API
+   * and optimistically updates the local state for a responsive user experience.
+   *
+   * @param {string} orderId - The ID of the order to update.
+   * @param {OrderStatus} newStatus - The new status to set for the order.
+   */
   const handleStatusChange = async (
     orderId: string,
-    newStatus: "Pending" | "Completed" | "Cancelled"
+    newStatus: OrderStatus
   ) => {
     setUpdatingOrderId(orderId);
 
+    // Use a toast promise for better async feedback to the user.
     toast.promise(
       fetch(`/api/orders/${orderId}`, {
         method: "PATCH",
@@ -70,7 +94,7 @@ export default function ManageOrdersPage() {
         loading: "Updating order status...",
         success: (res) => {
           if (!res.ok) throw new Error("Update failed.");
-          // Update the local state to reflect the change immediately
+          // Optimistically update the local state to reflect the change immediately.
           setOrders((prevOrders) =>
             prevOrders.map((order) =>
               order._id === orderId ? { ...order, status: newStatus } : order
@@ -84,9 +108,14 @@ export default function ManageOrdersPage() {
     );
   };
 
+  /**
+   * A helper function to determine the visual variant of the status badge.
+   * @param {OrderStatus} status - The current status of the order.
+   * @returns {'success' | 'default' | 'destructive' | 'outline'} The badge variant.
+   */
   const getStatusBadgeVariant = (
-    status: "Pending" | "Completed" | "Cancelled"
-  ) => {
+    status: OrderStatus
+  ): "success" | "default" | "destructive" | "outline" => {
     switch (status) {
       case "Completed":
         return "success";
@@ -99,6 +128,7 @@ export default function ManageOrdersPage() {
     }
   };
 
+  // Displays a loading spinner while the initial data is being fetched.
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -107,6 +137,7 @@ export default function ManageOrdersPage() {
     );
   }
 
+  // Displays an error message if the data fetch fails.
   if (error) {
     return (
       <Alert variant="destructive">
@@ -120,13 +151,13 @@ export default function ManageOrdersPage() {
   return (
     <div className="py-6 space-y-6">
       <header>
-        <h1 className="text-3xl font-headline font-bold">Manage Orders</h1>
+        <h1 className="text-3xl font-bold">Manage Orders</h1>
         <p className="text-muted-foreground">
           View and process customer orders.
         </p>
       </header>
 
-      <Card className="rounded-xl shadow-lg">
+      <Card className="rounded-lg shadow-md">
         <CardHeader>
           <CardTitle>Order List</CardTitle>
           <CardDescription>
@@ -151,6 +182,7 @@ export default function ManageOrdersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {/* TODO: Implement pagination for the orders table to handle a large number of records efficiently. */}
                 {orders.map((order) => (
                   <TableRow key={order._id}>
                     <TableCell className="font-medium">
@@ -159,9 +191,12 @@ export default function ManageOrdersPage() {
                     <TableCell>
                       {new Date(order.date).toLocaleDateString()}
                     </TableCell>
+                    {/* The API populates `userId` with the user object, but we cast to `any` for simplicity.
+                        A better approach would be to extend the `Order` type to reflect the populated field. */}
                     <TableCell>
                       {(order.userId as any)?.name || "N/A"}
                     </TableCell>
+                    {/* TODO: The currency 'Ksh.' is hardcoded. Use a centralized currency formatter. */}
                     <TableCell className="text-right">
                       Ksh. {order.totalAmount.toFixed(2)}
                     </TableCell>
@@ -171,6 +206,7 @@ export default function ManageOrdersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center w-48">
+                      {/* Show a loader in place of the select menu while this specific order is updating. */}
                       {updatingOrderId === order._id ? (
                         <div className="flex justify-center items-center">
                           <Loader2 className="h-5 w-5 animate-spin" />
@@ -178,9 +214,9 @@ export default function ManageOrdersPage() {
                       ) : (
                         <Select
                           defaultValue={order.status}
-                          onValueChange={(
-                            value: "Pending" | "Completed" | "Cancelled"
-                          ) => handleStatusChange(order._id, value)}
+                          onValueChange={(value: OrderStatus) =>
+                            handleStatusChange(order._id, value)
+                          }
                         >
                           <SelectTrigger className="h-9">
                             <SelectValue placeholder="Change status" />

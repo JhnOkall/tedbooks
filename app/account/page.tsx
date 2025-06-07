@@ -1,3 +1,9 @@
+/**
+ * @file This file defines the main "My Account" page and its constituent components.
+ * It is a client-side component that fetches and displays user-specific data,
+ * including profile information, order history, and downloadable content.
+ */
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -23,11 +29,18 @@ import { User, Package, Download, Phone, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 // --- Child Component: ProfileSection ---
+
+/**
+ * Displays the user's profile information.
+ * Shows a skeleton loader while the profile data is being fetched.
+ * @param {object} props - The component props.
+ * @param {UserProfile | null} props.profile - The user's profile data.
+ */
 function ProfileSection({ profile }: { profile: UserProfile | null }) {
+  // Renders a skeleton loader if profile data is not yet available.
   if (!profile) {
-    // Show a skeleton loader while profile is fetching
     return (
-      <Card className="shadow-lg rounded-2xl">
+      <Card className="shadow-lg rounded-lg">
         <CardHeader>
           <CardTitle>Loading profile...</CardTitle>
         </CardHeader>
@@ -47,7 +60,7 @@ function ProfileSection({ profile }: { profile: UserProfile | null }) {
   }
 
   return (
-    <Card className="shadow-lg rounded-2xl">
+    <Card className="shadow-lg rounded-lg">
       <CardHeader className="flex flex-row items-center space-x-4 pb-4">
         <Avatar className="h-20 w-20 border-2 border-primary">
           {profile.image && (
@@ -58,9 +71,7 @@ function ProfileSection({ profile }: { profile: UserProfile | null }) {
           </AvatarFallback>
         </Avatar>
         <div>
-          <CardTitle className="text-3xl font-headline">
-            {profile.name}
-          </CardTitle>
+          <CardTitle className="text-3xl">{profile.name}</CardTitle>
           <CardDescription className="text-md">{profile.email}</CardDescription>
         </div>
       </CardHeader>
@@ -69,10 +80,11 @@ function ProfileSection({ profile }: { profile: UserProfile | null }) {
           <Phone className="mr-2 h-4 w-4 text-muted-foreground" />
           <span>Phone: {profile.phone || "Not Provided"}</span>
         </div>
-        {/* You can add address here if you add it to your User model and API */}
+        {/* TODO: Add an address section here if user addresses are added to the User model and API. */}
       </CardContent>
       <CardFooter>
-        {/* This would link to a future profile editing page */}
+        {/* TODO: Implement the profile editing functionality. This will require a new page or modal
+        and a corresponding PATCH endpoint for updating user details. */}
         <Button variant="outline" className="rounded-lg" disabled>
           Edit Profile
         </Button>
@@ -82,13 +94,19 @@ function ProfileSection({ profile }: { profile: UserProfile | null }) {
 }
 
 // --- Child Component: OrderCard ---
+
+/**
+ * Renders a summary card for a single order.
+ * @param {object} props - The component props.
+ * @param {Order} props.order - The order data to display.
+ */
 function OrderCard({ order }: { order: Order }) {
   return (
-    <Card className="shadow-md rounded-xl overflow-hidden">
+    <Card className="shadow-md rounded-lg overflow-hidden">
       <CardHeader className="bg-muted/50 p-4">
         <div className="flex flex-wrap justify-between items-center gap-2">
           <div>
-            <CardTitle className="text-lg font-headline">
+            <CardTitle className="text-lg">
               Order ID: {order.customId}
             </CardTitle>
             <CardDescription className="text-xs">
@@ -96,9 +114,12 @@ function OrderCard({ order }: { order: Order }) {
             </CardDescription>
           </div>
           <div className="text-right">
+            {/* TODO: The currency 'Ksh.' is hardcoded. Refactor to use a centralized
+            currency formatting utility (e.g., `Intl.NumberFormat`) to support internationalization. */}
             <p className="font-semibold text-lg text-primary">
               Ksh. {order.totalAmount.toFixed(2)}
             </p>
+            {/* Dynamically styles the status badge based on the order status. */}
             <span
               className={`text-xs px-2 py-1 rounded-full font-medium ${
                 order.status === "Completed"
@@ -139,6 +160,12 @@ function OrderCard({ order }: { order: Order }) {
 }
 
 // --- Child Component: OrdersSection ---
+
+/**
+ * Renders a list of a user's past orders.
+ * @param {object} props - The component props.
+ * @param {Order[] | null} props.orders - An array of the user's orders.
+ */
 function OrdersSection({ orders }: { orders: Order[] | null }) {
   if (!orders) return null; // Or a loading state if passed separately
 
@@ -156,22 +183,30 @@ function OrdersSection({ orders }: { orders: Order[] | null }) {
 }
 
 // --- Child Component: DownloadsSection ---
+
+/**
+ * Renders a list of all downloadable items from the user's completed orders.
+ * @param {object} props - The component props.
+ * @param {Order[] | null} props.orders - An array of the user's orders.
+ */
 function DownloadsSection({ orders }: { orders: Order[] | null }) {
   if (!orders) return null;
 
-  const downloadableItems: OrderItem[] = orders
-    .filter((order) => order.status === "Completed")
-    .flatMap((order) => order.items)
-    .filter(
-      (item): item is OrderItem & { downloadUrl: string } => !!item.downloadUrl
-    );
+  // Filters all orders to find completed ones, then flattens the items
+  // and filters for those that have a valid `downloadUrl`.
+  const downloadableItems: OrderItem[] =
+    orders
+      .filter((order) => order.status === "Completed")
+      .flatMap((order) => order.items)
+      .filter(
+        (item): item is OrderItem & { downloadUrl: string } =>
+          !!item.downloadUrl
+      ) || [];
 
   return (
-    <Card className="shadow-lg rounded-2xl">
+    <Card className="shadow-lg rounded-lg">
       <CardHeader>
-        <CardTitle className="text-2xl font-headline">
-          My Downloadable Books
-        </CardTitle>
+        <CardTitle className="text-2xl">My Downloadable Books</CardTitle>
         <CardDescription>
           Access your purchased digital books here.
         </CardDescription>
@@ -199,6 +234,10 @@ function DownloadsSection({ orders }: { orders: Order[] | null }) {
                     </p>
                   </div>
                 </div>
+                {/* TODO: [Security] Implement a secure download mechanism. Storing and linking to static
+                `downloadUrl`s is a security risk. A better approach is to create a new API endpoint
+                (e.g., `/api/downloads/[orderItemId]`) that verifies ownership and generates a
+                secure, time-limited, pre-signed URL for the asset on-demand. */}
                 <Button asChild size="sm" className="rounded-lg">
                   <Link
                     href={item.downloadUrl}
@@ -223,6 +262,11 @@ function DownloadsSection({ orders }: { orders: Order[] | null }) {
 }
 
 // --- Main Page Component ---
+
+/**
+ * The main component for the user account page. It orchestrates data fetching
+ * and displays the profile, orders, and downloads in a tabbed interface.
+ */
 export default function AccountPage() {
   const { status } = useSession();
   const router = useRouter();
@@ -231,8 +275,12 @@ export default function AccountPage() {
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  /**
+   * Effect hook to fetch all necessary account data when the user's
+   * authentication status is confirmed.
+   */
   useEffect(() => {
-    // Middleware handles redirection, but this is a client-side safeguard.
+    // A client-side safeguard, though middleware should primarily handle this.
     if (status === "unauthenticated") {
       router.push("/api/auth/signin?callbackUrl=/account");
       return;
@@ -242,6 +290,7 @@ export default function AccountPage() {
       const fetchData = async () => {
         setIsLoading(true);
         try {
+          // Fetches profile and order data in parallel for better performance.
           const [profileRes, ordersRes] = await Promise.all([
             fetch("/api/users/me"),
             fetch("/api/orders"),
@@ -249,6 +298,8 @@ export default function AccountPage() {
 
           if (profileRes.ok) setProfile(await profileRes.json());
           if (ordersRes.ok) setOrders(await ordersRes.json());
+          // TODO: Add more specific error handling for non-ok responses to provide
+          // better user feedback, e.g., showing a toast notification.
         } catch (error) {
           console.error("Failed to fetch account data:", error);
         } finally {
@@ -259,6 +310,7 @@ export default function AccountPage() {
     }
   }, [status, router]);
 
+  // Shows a page-level loader while waiting for the session or initial data.
   if (status === "loading" || isLoading) {
     return (
       <MainLayout>
@@ -273,28 +325,26 @@ export default function AccountPage() {
     <MainLayout>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-16">
         <header className="mb-10">
-          <h1 className="text-4xl font-headline font-bold text-center">
-            My Account
-          </h1>
+          <h1 className="text-4xl font-bold text-center">My Account</h1>
         </header>
 
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 md:max-w-md mx-auto mb-8 rounded-xl p-1.5 h-auto">
+          <TabsList className="grid w-full grid-cols-3 md:max-w-md mx-auto mb-8 rounded-lg p-1.5 h-auto">
             <TabsTrigger
               value="profile"
-              className="py-2.5 text-sm md:text-base rounded-lg data-[state=active]:shadow-md"
+              className="py-2.5 text-sm md:text-base rounded-md data-[state=active]:shadow-md"
             >
               <User className="mr-2 h-5 w-5" /> Profile
             </TabsTrigger>
             <TabsTrigger
               value="orders"
-              className="py-2.5 text-sm md:text-base rounded-lg data-[state=active]:shadow-md"
+              className="py-2.5 text-sm md:text-base rounded-md data-[state=active]:shadow-md"
             >
               <Package className="mr-2 h-5 w-5" /> Orders
             </TabsTrigger>
             <TabsTrigger
               value="downloads"
-              className="py-2.5 text-sm md:text-base rounded-lg data-[state=active]:shadow-md"
+              className="py-2.5 text-sm md:text-base rounded-md data-[state=active]:shadow-md"
             >
               <Download className="mr-2 h-5 w-5" /> Downloads
             </TabsTrigger>

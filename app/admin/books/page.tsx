@@ -1,3 +1,8 @@
+/**
+ * @file This file defines the admin page for managing the book catalog.
+ * It provides a table view of all books with actions to add, edit, or delete them.
+ */
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -35,13 +40,22 @@ import type { IBook } from "@/models/Book";
 import { PlusCircle, Edit, Trash2, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
+/**
+ * The main component for the "Manage Books" admin page. It fetches and displays
+ * all books in a table and provides UI for CRUD (Create, Read, Update, Delete) operations.
+ */
 export default function ManageBooksPage() {
   const [books, setBooks] = useState<IBook[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // State to hold the book targeted for deletion, which also controls the confirmation dialog.
   const [bookToDelete, setBookToDelete] = useState<IBook | null>(null);
+  // State to manage the loading status during the deletion API call.
   const [isDeleting, setIsDeleting] = useState(false);
 
+  /**
+   * Effect hook to fetch all books from the API when the component mounts.
+   */
   useEffect(() => {
     const fetchBooks = async () => {
       setIsLoading(true);
@@ -61,6 +75,10 @@ export default function ManageBooksPage() {
     fetchBooks();
   }, []);
 
+  /**
+   * Handles the deletion of a book after confirmation.
+   * It sends a DELETE request to the API and optimistically updates the local state.
+   */
   const handleDeleteBook = async () => {
     if (!bookToDelete) return;
     setIsDeleting(true);
@@ -74,7 +92,7 @@ export default function ManageBooksPage() {
         throw new Error("Failed to delete the book.");
       }
 
-      // Update UI instantly
+      // Optimistically update the UI by filtering out the deleted book.
       setBooks((prevBooks) =>
         prevBooks.filter((book) => book._id !== bookToDelete._id)
       );
@@ -82,11 +100,12 @@ export default function ManageBooksPage() {
     } catch (err: any) {
       toast.error(err.message);
     } finally {
-      setBookToDelete(null);
+      setBookToDelete(null); // Close the confirmation dialog.
       setIsDeleting(false);
     }
   };
 
+  // Displays a loading spinner while the initial data is being fetched.
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -95,6 +114,7 @@ export default function ManageBooksPage() {
     );
   }
 
+  // Displays an error message if the data fetch fails.
   if (error) {
     return (
       <Alert variant="destructive" className="max-w-2xl mx-auto">
@@ -110,7 +130,7 @@ export default function ManageBooksPage() {
       <div className="py-6 space-y-6">
         <header className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-headline font-bold">Manage Books</h1>
+            <h1 className="text-3xl font-bold">Manage Books</h1>
             <p className="text-muted-foreground">
               Add, edit, or remove books from your catalog.
             </p>
@@ -122,7 +142,7 @@ export default function ManageBooksPage() {
           </Button>
         </header>
 
-        <Card className="rounded-xl shadow-lg">
+        <Card className="rounded-lg shadow-md">
           <CardHeader>
             <CardTitle>Book List</CardTitle>
             <CardDescription>
@@ -136,6 +156,7 @@ export default function ManageBooksPage() {
               </p>
             ) : (
               <div className="overflow-x-auto">
+                {/* TODO: Implement pagination for the books table to handle a large catalog efficiently. */}
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -156,13 +177,14 @@ export default function ManageBooksPage() {
                             alt={book.title}
                             width={50}
                             height={75}
-                            className="rounded object-cover"
+                            className="rounded object-cover aspect-[2/3]"
                           />
                         </TableCell>
                         <TableCell className="font-medium">
                           {book.title}
                         </TableCell>
                         <TableCell>{book.author}</TableCell>
+                        {/* TODO: The currency 'Ksh.' is hardcoded. Use a centralized currency formatter. */}
                         <TableCell className="text-right">
                           Ksh. {book.price.toFixed(2)}
                         </TableCell>
@@ -201,7 +223,7 @@ export default function ManageBooksPage() {
         </Card>
       </div>
 
-      {/* Confirmation Dialog for Deletion */}
+      {/* Renders the deletion confirmation dialog when a book is selected for deletion. */}
       <AlertDialog
         open={!!bookToDelete}
         onOpenChange={() => setBookToDelete(null)}
@@ -223,9 +245,7 @@ export default function ManageBooksPage() {
               disabled={isDeleting}
               className="bg-destructive hover:bg-destructive/90"
             >
-              {isDeleting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
+              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -1,31 +1,61 @@
+/**
+ * @file This file defines the static Privacy Policy page for the application.
+ * It outlines how user data is collected, used, and protected.
+ */
+
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { JSX } from "react";
 
-// A small helper component to keep the structure clean
+/**
+ * A reusable helper component to structure sections within a policy or content page.
+ * It provides a consistent heading and styling for the enclosed content.
+ *
+ * @param {object} props - The component props.
+ * @param {string} props.title - The title of the policy section.
+ * @param {React.ReactNode} props.children - The content of the section.
+ * @returns {JSX.Element} The rendered policy section.
+ */
 const PolicySection = ({
   title,
   children,
 }: {
   title: string;
   children: React.ReactNode;
-}) => (
+}): JSX.Element => (
   <div className="space-y-2">
-    <h2 className="text-2xl font-headline font-semibold">{title}</h2>
+    <h2 className="text-2xl font-semibold">{title}</h2>
+    {/*
+      The `prose` classes from @tailwindcss/typography are used here to automatically
+      apply beautiful and readable styling to the raw HTML elements (p, ul, li, etc.)
+      within the children, avoiding the need for manual styling of content.
+    */}
     <div className="prose prose-lg max-w-none text-foreground/80 dark:prose-invert">
       {children}
     </div>
   </div>
 );
 
-export default function PrivacyPolicyPage() {
+/**
+ * The main server component for the Privacy Policy page.
+ * It statically renders the legal text for the application.
+ *
+ * @returns {JSX.Element} The rendered Privacy Policy page.
+ */
+// TODO: Convert this page to be dynamic. The content should be fetched from the SiteContent API
+// using a specific key (e.g., 'privacyPolicy'). This would allow administrators to update
+// the policy via a CMS without requiring a code deployment.
+export default function PrivacyPolicyPage(): JSX.Element {
   return (
     <MainLayout>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-16">
-        <Card className="max-w-4xl mx-auto rounded-2xl shadow-xl">
+        <Card className="max-w-4xl mx-auto rounded-lg shadow-lg">
           <CardHeader>
-            <CardTitle className="text-3xl md:text-4xl font-headline text-center">
+            <CardTitle className="text-3xl md:text-4xl text-center">
               Privacy Policy
             </CardTitle>
+            {/* TODO: The "Last Updated" date is hardcoded. If this page becomes dynamic,
+            this date should be populated from the `updatedAt` field of the fetched content object. */}
             <p className="text-center text-muted-foreground pt-2">
               Last Updated: 7th June, 2023
             </p>
@@ -186,6 +216,8 @@ export default function PrivacyPolicyPage() {
                 please contact us at:
               </p>
               <p>
+                {/* TODO: The contact email is hardcoded. This should be an environment
+                variable or a value fetched from the SiteContent API to be easily configurable. */}
                 <strong>support@tedbooks.example.com</strong>
               </p>
             </PolicySection>

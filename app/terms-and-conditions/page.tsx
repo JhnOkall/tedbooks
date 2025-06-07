@@ -1,37 +1,67 @@
+/**
+ * @file This file defines the static Terms and Conditions page for the application.
+ * It outlines the rules and agreements for using the service.
+ */
+
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
+import { JSX } from "react";
 
-// A small helper component for consistent section styling
+/**
+ * A reusable helper component to structure sections within a policy page.
+ * It provides a consistent heading and uses Tailwind's `prose` classes for readable content styling.
+ *
+ * @param {object} props - The component props.
+ * @param {string} props.title - The title of the policy section.
+ * @param {React.ReactNode} props.children - The content of the section.
+ * @returns {JSX.Element} The rendered policy section.
+ */
 const TermSection = ({
   title,
   children,
 }: {
   title: string;
   children: React.ReactNode;
-}) => (
+}): JSX.Element => (
   <div className="space-y-2">
-    <h2 className="text-2xl font-headline font-semibold">{title}</h2>
+    <h2 className="text-2xl font-semibold">{title}</h2>
+    {/*
+      The `prose` classes automatically style the raw HTML elements within the children,
+      ensuring consistent and readable typography for the legal text.
+    */}
     <div className="prose prose-lg max-w-none text-foreground/80 dark:prose-invert">
       {children}
     </div>
   </div>
 );
 
-export default function TermsAndConditionsPage() {
+/**
+ * The main server component for the Terms and Conditions page.
+ * It statically renders the legal text for the application.
+ *
+ * @returns {JSX.Element} The rendered Terms and Conditions page.
+ */
+// TODO: Convert this page to be dynamic by fetching its content from the SiteContent API
+// using a specific key (e.g., 'termsAndConditions'). This would allow administrators
+// to update the terms via a CMS without requiring a code deployment.
+export default function TermsAndConditionsPage(): JSX.Element {
   return (
     <MainLayout>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-16">
-        <Card className="max-w-4xl mx-auto rounded-2xl shadow-xl">
+        <Card className="max-w-4xl mx-auto rounded-lg shadow-lg">
           <CardHeader>
-            <CardTitle className="text-3xl md:text-4xl font-headline text-center">
+            <CardTitle className="text-3xl md:text-4xl text-center">
               Terms and Conditions
             </CardTitle>
+            {/* TODO: The "Last Updated" date is hardcoded. If this page becomes dynamic,
+            this date should be populated from the `updatedAt` field of the fetched content object. */}
             <p className="text-center text-muted-foreground pt-2">
               Last Updated: October 26, 2023
             </p>
           </CardHeader>
           <CardContent className="space-y-8">
+            {/* A disclaimer is included to clarify that this is a template and not legal advice. */}
             <div className="p-4 bg-yellow-100 dark:bg-yellow-900/30 border-l-4 border-yellow-500 text-yellow-800 dark:text-yellow-200 rounded-r-lg">
               <p className="font-bold">Disclaimer:</p>
               <p>
@@ -66,6 +96,7 @@ export default function TermsAndConditionsPage() {
                   account.
                 </li>
                 <li>
+                  {/* TODO: Centralize the route path '/privacy-policy' in a shared constants file to improve maintainability. */}
                   Acknowledge that your phone number may be collected and stored
                   during the payment process via PayHero, as detailed in our{" "}
                   <Link
@@ -200,6 +231,8 @@ export default function TermsAndConditionsPage() {
                 us at:
               </p>
               <p>
+                {/* TODO: The contact email is hardcoded. This should be an environment
+                variable or a value fetched from the SiteContent API to be easily configurable. */}
                 <strong>support@tedbooks.example.com</strong>
               </p>
             </TermSection>

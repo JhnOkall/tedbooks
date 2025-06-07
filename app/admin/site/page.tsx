@@ -1,6 +1,12 @@
+/**
+ * @file This file defines the admin page for managing site content. It allows administrators
+ * to select and edit content blocks (like the "About Us" page) that are stored in the database.
+ */
+
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   Card,
   CardContent,
@@ -16,30 +22,49 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Save, ArrowLeft, Terminal, AlertCircle } from "lucide-react";
 
-// Define the content pieces that are editable by the admin
+/**
+ * Defines the configuration for content pieces that are editable by the admin.
+ * This array can be expanded to include more manageable content blocks in the future.
+ */
 const contentKeys = [
   { key: "aboutPageContent", label: "About Us Page" },
-  // Add other manageable content pages here in the future
-  // { key: 'faqPageContent', label: 'FAQ Page' },
+  // TODO: Add other manageable content pages here as the application grows.
+  // Example: { key: 'faqPageContent', label: 'FAQ Page' }
+  // Example: { key: 'termsAndConditions', label: 'Terms & Conditions' }
 ];
 
+/**
+ * Type definition for a single content item.
+ */
 type ContentItem = {
   key: string;
   title: string;
   content: string;
 };
 
+/**
+_  * The main component for the "Manage Site Content" page. It functions as a mini-CMS,
+ * allowing admins to switch between a list of editable content and a dedicated editor view.
+ */
 export default function ManageSiteContentPage() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [currentContent, setCurrentContent] = useState<Partial<ContentItem>>(
     {}
   );
   const [isLoading, setIsLoading] = useState(false);
+  // TODO: Refactor state management. The `error` and `success` states are currently managed
+  // with `useState` and displayed via `<Alert>`. Using a toast notification library (like the
+  // already-installed `sonner`) would provide a more consistent and less intrusive user experience.
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Finds the user-friendly label for the currently selected content key.
   const selectedLabel = contentKeys.find((c) => c.key === selectedKey)?.label;
 
+  /**
+   * Fetches the content for a selected key from the API and transitions to the editor view.
+   * @param {string} key - The unique key of the content to fetch.
+   */
   const handleSelectContent = async (key: string) => {
     setSelectedKey(key);
     setIsLoading(true);
@@ -48,10 +73,11 @@ export default function ManageSiteContentPage() {
     try {
       const res = await fetch(`/api/site-content/${key}`);
       if (res.ok) {
+        // If content exists, populate the editor with its data.
         const data = await res.json();
         setCurrentContent(data);
       } else if (res.status === 404) {
-        // Content doesn't exist yet, start with a blank slate
+        // If content is not found, start with a blank state for creation.
         setCurrentContent({ title: "", content: "" });
       } else {
         throw new Error("Failed to fetch content");
@@ -63,6 +89,9 @@ export default function ManageSiteContentPage() {
     }
   };
 
+  /**
+   * Saves the current content in the editor to the database via a PATCH request.
+   */
   const handleSave = async () => {
     if (!selectedKey) return;
 
@@ -92,8 +121,8 @@ export default function ManageSiteContentPage() {
     }
   };
 
+  // --- Renders the EDITOR VIEW if a content key is selected ---
   if (selectedKey) {
-    // --- EDITING VIEW ---
     return (
       <div className="py-6 space-y-6">
         <header>
@@ -102,7 +131,7 @@ export default function ManageSiteContentPage() {
           </Button>
         </header>
 
-        <Card className="rounded-xl shadow-lg">
+        <Card className="rounded-lg shadow-md">
           <CardHeader>
             <CardTitle>Editing: {selectedLabel}</CardTitle>
             <CardDescription>
@@ -182,19 +211,17 @@ export default function ManageSiteContentPage() {
     );
   }
 
-  // --- SELECTION VIEW ---
+  // --- Renders the SELECTION VIEW by default ---
   return (
     <div className="py-6 space-y-6">
       <header>
-        <h1 className="text-3xl font-headline font-bold">
-          Manage Site Content
-        </h1>
+        <h1 className="text-3xl font-bold">Manage Site Content</h1>
         <p className="text-muted-foreground">
           Update the content for key pages like 'About Us'.
         </p>
       </header>
 
-      <Card className="rounded-xl shadow-lg">
+      <Card className="rounded-lg shadow-md">
         <CardHeader>
           <CardTitle>Editable Content</CardTitle>
           <CardDescription>

@@ -1,6 +1,11 @@
+/**
+ * @file This file defines the dynamic admin page for editing an existing book.
+ * It fetches the book's current data and provides a form to update its details and files.
+ */
+
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, FormEvent, ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -23,20 +28,27 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Save, Ban, Loader2, AlertCircle, ArrowLeft } from "lucide-react";
 
+/**
+ * A dynamic client page for editing a book. The specific book is determined by
+ * the `id` parameter in the URL (e.g., `/admin/books/edit/[id]`).
+ */
 export default function EditBookPage() {
   const router = useRouter();
   const params = useParams();
   const bookId = params.id as string;
 
   const [bookData, setBookData] = useState<Partial<IBook>>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Manages initial data fetching state.
+  const [isSubmitting, setIsSubmitting] = useState(false); // Manages form submission state.
   const [error, setError] = useState<string | null>(null);
 
-  // Refs for file inputs
+  // Refs for file inputs to access selected files.
   const coverFileRef = useRef<HTMLInputElement>(null);
   const bookFileRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * Effect hook to fetch the existing book data from the API when the component mounts.
+   */
   useEffect(() => {
     if (!bookId) return;
 
@@ -59,18 +71,30 @@ export default function EditBookPage() {
     fetchBookData();
   }, [bookId]);
 
+  /**
+   * A generic handler to update the `bookData` state for text inputs and textareas.
+   * @param {ChangeEvent<HTMLInputElement | HTMLTextAreaElement>} e - The change event.
+   */
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setBookData((prev) => ({ ...prev, [name]: value }));
   };
 
+  /**
+   * A specific handler for the 'featured' checkbox.
+   * @param {boolean} checked - The new checked state of the checkbox.
+   */
   const handleCheckboxChange = (checked: boolean) => {
     setBookData((prev) => ({ ...prev, featured: checked }));
   };
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  /**
+   * Handles the form submission, including optional file uploads and updating the book data.
+   * @param {FormEvent<HTMLFormElement>} event - The form submission event.
+   */
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
     setError(null);
@@ -79,7 +103,7 @@ export default function EditBookPage() {
     const newBookFile = bookFileRef.current?.files?.[0];
 
     try {
-      const uploadFile = async (file: File) => {
+      const uploadFile = async (file: File): Promise<string> => {
         const response = await fetch(
           `/api/upload?filename=${encodeURIComponent(file.name)}`,
           { method: "POST", body: file }
@@ -88,20 +112,21 @@ export default function EditBookPage() {
         return (await response.json()).url;
       };
 
-      // Create a mutable copy of the data to update
+      // Create a mutable copy of the book data to be sent to the API.
       const updatedData = { ...bookData };
 
-      // Upload new files if they exist
+      // If a new cover image is provided, upload it and update the `coverImage` URL.
       if (newCoverFile) {
         toast.info("Uploading new cover image...");
         updatedData.coverImage = await uploadFile(newCoverFile);
       }
+      // If a new book file is provided, upload it and update the `fileUrl`.
       if (newBookFile) {
         toast.info("Uploading new book file...");
         updatedData.fileUrl = await uploadFile(newBookFile);
       }
 
-      // Send the PATCH request to update the book
+      // Send the PATCH request with the updated data to the API.
       toast.loading("Saving changes...");
       const res = await fetch(`/api/books/${bookId}`, {
         method: "PATCH",
@@ -125,6 +150,7 @@ export default function EditBookPage() {
     }
   };
 
+  // Displays a loader while fetching initial book data.
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -133,11 +159,11 @@ export default function EditBookPage() {
     );
   }
 
+  // Displays an error message if the initial data fetch fails completely.
   if (error && !bookData.title) {
-    // Show error page if fetching failed completely
     return (
       <div className="py-6 space-y-4 text-center">
-        <h1 className="text-3xl font-headline font-bold">Error</h1>
+        <h1 className="text-3xl font-bold">Error</h1>
         <Alert variant="destructive" className="max-w-md mx-auto">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Could Not Load Book</AlertTitle>
@@ -154,7 +180,7 @@ export default function EditBookPage() {
     <div className="py-6 space-y-6">
       <header className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-headline font-bold truncate">
+          <h1 className="text-3xl font-bold truncate">
             Edit Book: {bookData.title}
           </h1>
           <p className="text-muted-foreground">
@@ -168,7 +194,7 @@ export default function EditBookPage() {
         </Button>
       </header>
 
-      <Card className="rounded-xl shadow-lg">
+      <Card className="rounded-lg shadow-md">
         <form onSubmit={handleSubmit}>
           <CardHeader>
             <CardTitle>Book Details</CardTitle>
@@ -213,12 +239,13 @@ export default function EditBookPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="price">Price (Ksh)</Label>
+                <Label htmlFor="price">Price (KES)</Label>
                 <Input
                   name="price"
                   id="price"
                   type="number"
                   step="0.01"
+                  min="0"
                   value={bookData.price || ""}
                   onChange={handleInputChange}
                   required
@@ -246,6 +273,7 @@ export default function EditBookPage() {
                 value={bookData.description || ""}
                 onChange={handleInputChange}
                 rows={3}
+                required
                 disabled={isSubmitting}
               />
             </div>
@@ -258,13 +286,14 @@ export default function EditBookPage() {
                 value={bookData.synopsis || ""}
                 onChange={handleInputChange}
                 rows={6}
+                required
                 disabled={isSubmitting}
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               <div className="space-y-2">
-                <Label htmlFor="coverFile">Update Cover Image</Label>
+                <Label htmlFor="coverFile">Update Cover Image (Optional)</Label>
                 <Input
                   id="coverFile"
                   ref={coverFileRef}
@@ -288,7 +317,7 @@ export default function EditBookPage() {
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="bookFile">Update Book File</Label>
+                <Label htmlFor="bookFile">Update Book File (Optional)</Label>
                 <Input
                   id="bookFile"
                   ref={bookFileRef}
@@ -321,7 +350,7 @@ export default function EditBookPage() {
                 onCheckedChange={handleCheckboxChange}
                 disabled={isSubmitting}
               />
-              <Label htmlFor="featured" className="font-normal">
+              <Label htmlFor="featured" className="font-normal cursor-pointer">
                 Mark as Featured Book
               </Label>
             </div>
@@ -329,7 +358,7 @@ export default function EditBookPage() {
           <CardFooter className="flex justify-between pt-4">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               asChild
               className="rounded-lg"
             >
