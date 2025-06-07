@@ -18,20 +18,39 @@ function getBaseUrl() {
  */
 export async function getFeaturedBooks(): Promise<IBook[]> {
   const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/api/books?featured=true`;
+  
+  console.log('Fetching featured books from:', url);
+  
   try {
-    const res = await fetch(`${baseUrl}/api/books?featured=true`, {
+    const res = await fetch(url, {
       // Revalidate this data every hour (3600 seconds)
       // This caches the result and prevents hitting the DB on every request.
       next: { revalidate: 3600 },
     });
 
+    console.log('Response status:', res.status, res.statusText);
+
     if (!res.ok) {
-      // Log the error for debugging, but don't crash the page
-      console.error(`Failed to fetch featured books: ${res.statusText}`);
+      // Get the response body for more details
+      const errorText = await res.text();
+      console.error(`Failed to fetch featured books: ${res.status} ${res.statusText}`, errorText);
+      
+      // Try to parse as JSON for more details
+      try {
+        const errorJson = JSON.parse(errorText);
+        console.error('Error details:', errorJson);
+      } catch {
+        // Not JSON, just log the text
+        console.error('Error response:', errorText);
+      }
+      
       return [];
     }
 
-    return res.json();
+    const data = await res.json();
+    console.log(`Successfully fetched ${data.length} featured books`);
+    return data;
   } catch (error) {
     console.error("An error occurred in getFeaturedBooks:", error);
     // Return an empty array on network or other errors to prevent page crash
@@ -61,7 +80,8 @@ export async function getAllBooks(searchQuery?: string): Promise<IBook[]> {
     });
 
     if (!res.ok) {
-      console.error(`Failed to fetch books: ${res.statusText}`);
+      const errorText = await res.text();
+      console.error(`Failed to fetch books: ${res.statusText}`, errorText);
       return [];
     }
     
