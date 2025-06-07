@@ -1,20 +1,22 @@
 /**
  * @file This file defines the `BookDetailClient` component, a client-side component
  * that renders the main content of a book's detail page. It handles user interactions
- * like adding a book to the cart and displays related books.
+ * like adding a book to the cart, sharing the page, and displays related books.
  */
 
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, Tag } from "lucide-react";
+import { ShoppingCart, Tag, Share2, Check } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { BookCard } from "@/components/books/BookCard";
 import { Separator } from "@/components/ui/separator";
 import { motion } from "framer-motion";
 import type { IBook } from "@/models/Book";
 import { JSX } from "react";
+import { toast } from "sonner";
 
 /**
  * Defines the props required by the `BookDetailClient` component.
@@ -28,8 +30,9 @@ interface BookDetailClientProps {
 
 /**
  * Renders the detailed view for a single book, including its cover, synopsis,
- * price, and an "Add to Cart" button. It also displays a list of related books.
- * This is a client component to allow for interactivity and animations.
+ * price, and interactive buttons for adding to cart and sharing.
+ * It also displays a list of related books.
+ * This is a client component to allow for interactivity and browser APIs.
  *
  * @param {BookDetailClientProps} props - The props for the component.
  * @returns {JSX.Element} The rendered book detail page content.
@@ -39,6 +42,42 @@ export function BookDetailClient({
   relatedBooks,
 }: BookDetailClientProps): JSX.Element {
   const { addToCart } = useCart();
+  const [isCopied, setIsCopied] = useState(false);
+
+  /**
+   * Handles the share action. It uses the Web Share API on supported devices (mobile)
+   * and falls back to copying the link to the clipboard on other devices (desktop).
+   */
+  const handleShare = async () => {
+    const shareData = {
+      title: book.title,
+      text: `Check out "${book.title}" by ${book.author} on TedBooks!`,
+      // window.location.href gets the full, current URL of the page.
+      url: window.location.href,
+    };
+
+    // Check if the Web Share API is available in the browser
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        console.log("Book shared successfully!");
+      } catch (err) {
+        // Log error if user cancels share or an error occurs
+        console.error("Share failed:", err);
+      }
+    } else {
+      // Fallback for desktop: copy link to clipboard
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        setIsCopied(true);
+        // Reset the "Copied!" feedback message after 2 seconds
+        setTimeout(() => setIsCopied(false), 2000);
+      } catch (err) {
+        console.error("Failed to copy link:", err);
+        toast("Failed to copy link to clipboard.");
+      }
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-16">
@@ -56,7 +95,7 @@ export function BookDetailClient({
             fill
             sizes="(max-width: 768px) 100vw, 50vw"
             className="object-cover"
-            priority // Prioritizes loading this image, as it's likely the Largest Contentful Paint (LCP) element.
+            priority
           />
         </motion.div>
 
@@ -77,27 +116,41 @@ export function BookDetailClient({
             </span>
           </div>
 
-          {/* TODO: The currency symbol 'Ksh.' is hardcoded. This should be dynamic,
-          perhaps from a configuration file or a localization context, to support other currencies. */}
           <p className="text-3xl font-semibold text-primary mb-6">
             Ksh. {book.price.toFixed(2)}
           </p>
 
-          <Button
-            size="lg"
-            // The `addToCart` function expects a plain object with `_id` as a string.
-            // The `book` prop from the server has `_id` as a Mongoose ObjectId, so it's converted here.
-            onClick={() => addToCart({ ...book, _id: book._id.toString() })}
-            className="w-full md:w-auto mb-8 shadow-md rounded-lg text-lg"
-          >
-            <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
-          </Button>
+          {/* Action buttons container */}
+          <div className="flex flex-col sm:flex-row items-center gap-4 mb-8">
+            <Button
+              size="lg"
+              onClick={() => addToCart({ ...book, _id: book._id.toString() })}
+              className="w-full sm:w-auto shadow-md rounded-lg text-lg flex-grow"
+            >
+              <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={handleShare}
+              disabled={isCopied} // Disable button briefly after copying
+              className="w-full sm:w-auto shadow-md rounded-lg text-lg"
+            >
+              {isCopied ? (
+                <>
+                  <Check className="mr-2 h-5 w-5 text-green-500" /> Copied!
+                </>
+              ) : (
+                <>
+                  <Share2 className="mr-2 h-5 w-5" /> Share
+                </>
+              )}
+            </Button>
+          </div>
 
           <div className="space-y-4">
             <h2 className="text-2xl font-semibold">Synopsis</h2>
-            {/* Using Tailwind's 'prose' classes for clean typography styling of the synopsis content. */}
             <div className="prose prose-lg max-w-none text-foreground/80 dark:prose-invert">
-              {/* Renders each line of the synopsis as a separate paragraph for proper spacing. */}
               {book.synopsis.split("\n").map((paragraph, index) => (
                 <p key={index}>{paragraph}</p>
               ))}
@@ -122,7 +175,6 @@ export function BookDetailClient({
             {relatedBooks.map((relatedBook) => (
               <BookCard
                 key={relatedBook._id.toString()}
-                // The BookCard component expects the book `_id` to be a string.
                 book={{ ...relatedBook, _id: relatedBook._id.toString() }}
               />
             ))}
