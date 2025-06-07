@@ -1,43 +1,12 @@
-import { IBook } from "@/models/Book";
+import { getFeaturedBooks } from "@/lib/data";
 import { BookCard } from "./BookCard";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-// Helper function to get the base URL for API calls
-// This works on both server and client, and is configurable via environment variables
-function getBaseUrl() {
-  // If running on the server, use the internal host
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-  // Otherwise, use the localhost URL for local development
-  return process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-}
-
 // Make the component async to fetch data
 export async function FeaturedBooks() {
-  let featuredBooks: IBook[] = [];
-
-  // Directly fetch the featured books within the component
-  try {
-    const baseUrl = getBaseUrl();
-    const res = await fetch(`${baseUrl}/api/books?featured=true`, {
-      // Revalidate this data every hour (3600 seconds)
-      // This caches the result and prevents hitting the DB on every request.
-      next: { revalidate: 3600 },
-    });
-
-    if (!res.ok) {
-      // Log the error for debugging, but don't crash the page
-      console.error(`Failed to fetch featured books: ${res.statusText}`);
-      // Let the component render the "no books" state by keeping featuredBooks as an empty array
-    } else {
-      featuredBooks = await res.json();
-    }
-  } catch (error) {
-    console.error("An error occurred while fetching featured books:", error);
-    // On network or other errors, keep featuredBooks as an empty array to prevent page crash
-  }
+  // Await the data from the API
+  const featuredBooks = await getFeaturedBooks();
 
   // If there are no books, we can show a message or just nothing
   if (!featuredBooks || featuredBooks.length === 0) {
