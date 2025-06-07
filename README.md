@@ -96,11 +96,8 @@ AUTH_SECRET='your_auth_secret_here'
 AUTH_GOOGLE_ID='your_google_client_id'
 AUTH_GOOGLE_SECRET='your_google_client_secret'
 
-# Base URL for local development
-NEXT_PUBLIC_BASE_URL='http://localhost:3000'
-
-# Hosted URL
-VERCEL_URL='https://example.vercel.app'
+# Base URL
+NEXT_PUBLIC_BASE_URL='https://example.com'
 
 # MongoDB Connection String
 MONGODB_URI='your_mongodb_connection_string'

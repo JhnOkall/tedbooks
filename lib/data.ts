@@ -3,11 +3,6 @@ import { IBook } from "@/models/Book";
 // Helper function to get the base URL for API calls
 // This works on both server and client, and is configurable via environment variables
 function getBaseUrl() {
-  // If running on the server, use the internal host
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-  // Otherwise, use the localhost URL for local development
   return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 }
 
@@ -18,39 +13,20 @@ function getBaseUrl() {
  */
 export async function getFeaturedBooks(): Promise<IBook[]> {
   const baseUrl = getBaseUrl();
-  const url = `${baseUrl}/api/books?featured=true`;
-  
-  console.log('Fetching featured books from:', url);
-  
   try {
-    const res = await fetch(url, {
+    const res = await fetch(`${baseUrl}/api/books?featured=true`, {
       // Revalidate this data every hour (3600 seconds)
       // This caches the result and prevents hitting the DB on every request.
       next: { revalidate: 3600 },
     });
 
-    console.log('Response status:', res.status, res.statusText);
-
     if (!res.ok) {
-      // Get the response body for more details
-      const errorText = await res.text();
-      console.error(`Failed to fetch featured books: ${res.status} ${res.statusText}`, errorText);
-      
-      // Try to parse as JSON for more details
-      try {
-        const errorJson = JSON.parse(errorText);
-        console.error('Error details:', errorJson);
-      } catch {
-        // Not JSON, just log the text
-        console.error('Error response:', errorText);
-      }
-      
+      // Log the error for debugging, but don't crash the page
+      console.error(`Failed to fetch featured books: ${res.statusText}`);
       return [];
     }
 
-    const data = await res.json();
-    console.log(`Successfully fetched ${data.length} featured books`);
-    return data;
+    return res.json();
   } catch (error) {
     console.error("An error occurred in getFeaturedBooks:", error);
     // Return an empty array on network or other errors to prevent page crash
@@ -80,8 +56,7 @@ export async function getAllBooks(searchQuery?: string): Promise<IBook[]> {
     });
 
     if (!res.ok) {
-      const errorText = await res.text();
-      console.error(`Failed to fetch books: ${res.statusText}`, errorText);
+      console.error(`Failed to fetch books: ${res.statusText}`);
       return [];
     }
     
