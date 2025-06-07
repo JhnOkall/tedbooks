@@ -20,13 +20,6 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import Link from "next/link";
 import { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { Chrome } from "lucide-react"; // Using Chrome icon as a substitute for Google brand icon.
-
-/**
- * Renders a provider icon for the sign-in button.
- * Currently uses the Lucide 'Chrome' icon as a stand-in for the Google brand icon.
- */
-const SignInProviderIcon = () => <Chrome className="mr-2 h-5 w-5" />;
 
 /**
  * The main component for the sign-in page. It handles displaying sign-in options
@@ -86,7 +79,6 @@ export default function SignInPage() {
               className="w-full h-12 text-base rounded-lg border-2 hover:bg-accent/50"
               onClick={handleSignIn}
             >
-              <SignInProviderIcon />
               Continue with Google
             </Button>
           </CardContent>

@@ -25,6 +25,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
 
   /**
+   * Specifies custom pages for authentication actions.
+   * This allows for a fully branded and integrated user experience by overriding
+   * the default NextAuth.js pages.
+   */
+  pages: {
+    signIn: '/auth',
+    error: '/auth/error', // Error codes will be passed in the URL query string
+  },
+
+  /**
    * Callbacks for customizing the default behavior of NextAuth.
    */
   callbacks: {
