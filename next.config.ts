@@ -1,13 +1,22 @@
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Enable the experimental Node.js runtime for middleware.
+  // This is required because your middleware now uses database logic (via auth.ts)
+  // that is not compatible with the default Edge runtime.
+  experimental: {
+    nodeMiddleware: true,
+  },
+  // ----------------------
+
+  /* Other config options */
   typescript: {
     ignoreBuildErrors: true,
   },
   eslint: {
     ignoreDuringBuilds: true,
   },
+
   images: {
     remotePatterns: [
       {
