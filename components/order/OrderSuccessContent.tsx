@@ -1,3 +1,9 @@
+/**
+ * @file Defines the `OrderSuccessContent` component, which is responsible for displaying the
+ * order confirmation page. This client component fetches order details based on an ID from
+ * the URL, clears the user's cart, and provides download links for purchased items.
+ */
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -17,15 +23,29 @@ import type { Order, OrderItem } from "@/types";
 import { useCart } from "@/context/CartContext";
 import { Separator } from "@/components/ui/separator";
 
+/**
+ * Renders the content for the order success/confirmation page.
+ * It manages three states: loading, order not found (or error), and order found.
+ */
 export function OrderSuccessContent() {
   const searchParams = useSearchParams();
   const { clearCart } = useCart();
+  /**
+   * State to hold the order details. It uses a three-state approach:
+   * - `undefined`: Initial loading state before the fetch completes.
+   * - `null`: State indicating an error or that the order was not found.
+   * - `Order`: State indicating a successful fetch with order data.
+   */
   const [order, setOrder] = useState<Order | null | undefined>(undefined);
 
   const orderId = searchParams.get("orderId");
 
+  /**
+   * Effect hook to fetch the order details from the API when the component mounts
+   * or when the `orderId` in the URL changes.
+   */
   useEffect(() => {
-    // If no orderId is present in the URL, set state to not found.
+    // If there is no orderId in the URL, we can immediately determine the order is not found.
     if (!orderId) {
       setOrder(null);
       return;
@@ -35,7 +55,8 @@ export function OrderSuccessContent() {
       try {
         const res = await fetch(`/api/orders/${orderId}`);
 
-        // If API returns not-ok (e.g., 404, 403), treat as not found.
+        // If the API responds with a non-2xx status code (e.g., 404, 403),
+        // we treat it as an error and assume the order cannot be displayed.
         if (!res.ok) {
           throw new Error("Order not found or access denied.");
         }
@@ -43,37 +64,39 @@ export function OrderSuccessContent() {
         const data: Order = await res.json();
         setOrder(data);
 
-        // IMPORTANT: Clear the cart only after successfully fetching the order.
+        // Crucial Side Effect: Clear the user's shopping cart only after
+        // we have successfully confirmed and loaded their new order.
         clearCart();
       } catch (error) {
+        // TODO: Implement a robust logging service (e.g., Sentry) to capture production errors.
         console.error("Failed to fetch order:", error);
-        setOrder(null); // Set to not found on any error
+        setOrder(null); // Transition to the "not found" state on any fetch failure.
       }
     };
 
     fetchOrderDetails();
   }, [orderId, clearCart]);
 
-  // Initial loading state
+  // Render a loading state while the order data is being fetched.
   if (order === undefined) {
-    // The Suspense fallback will handle this, but as a backup:
+    // This state is typically handled by a <Suspense> boundary in Next.js,
+    // but this provides a fallback.
     return <p className="text-center py-20">Loading order details...</p>;
   }
 
-  // Order not found state
+  // Render an error/not-found state if the order could not be loaded.
   if (!order) {
     return (
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-16 text-center">
-        <Card className="max-w-lg mx-auto rounded-2xl shadow-xl p-8">
+        <Card className="max-w-lg mx-auto rounded-lg shadow-lg p-8">
           <ShoppingBag className="mx-auto h-20 w-20 text-destructive mb-6" />
-          <h1 className="text-3xl font-headline font-bold mb-4">
-            Order Not Found
-          </h1>
+          <h1 className="text-3xl font-bold mb-4">Order Not Found</h1>
           <p className="text-muted-foreground mb-8">
             We couldn't find the details for this order. It might be invalid, or
             you may not have permission to view it.
           </p>
-          <Button asChild size="lg" className="rounded-xl shadow-md">
+          {/* TODO: Centralize application routes like '/shop' into a constants file. */}
+          <Button asChild size="lg" className="rounded-lg shadow-md">
             <Link href="/shop">Continue Shopping</Link>
           </Button>
         </Card>
@@ -81,16 +104,16 @@ export function OrderSuccessContent() {
     );
   }
 
-  // Order found successfully state
-  // We check for download URLs. In a real app, these might be added later.
+  // Filter for items that have a download URL to render the downloads section.
   const downloadableItems = order.items.filter((item) => item.downloadUrl);
 
+  // Render the successful order confirmation view.
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-16">
-      <Card className="max-w-2xl mx-auto rounded-2xl shadow-xl text-center">
+      <Card className="max-w-2xl mx-auto rounded-lg shadow-lg text-center">
         <CardHeader className="pt-8">
           <CheckCircle className="mx-auto h-20 w-20 text-green-500 mb-4 animate-in fade-in zoom-in-75" />
-          <CardTitle className="text-3xl md:text-4xl font-headline">
+          <CardTitle className="text-3xl md:text-4xl">
             Thank You For Your Order!
           </CardTitle>
           <CardDescription className="text-lg text-muted-foreground pt-2">
@@ -100,15 +123,15 @@ export function OrderSuccessContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 px-6 md:px-10">
-          {/* This download section remains the same, it will work if downloadUrl is present */}
+          {/* Renders a list of purchased items with their download links. */}
           {downloadableItems.length > 0 && (
             <div>
               <h3 className="text-xl font-semibold mb-4">Your Downloads</h3>
               <ul className="space-y-4 text-left">
                 {downloadableItems.map((item: OrderItem) => (
                   <li
-                    key={item._id} // Use the unique order item ID
-                    className="flex items-center justify-between p-3 border rounded-lg shadow-sm bg-background"
+                    key={item._id}
+                    className="flex items-center justify-between p-3 border rounded-lg bg-background"
                   >
                     <div className="flex items-center space-x-3">
                       <Image
@@ -125,6 +148,9 @@ export function OrderSuccessContent() {
                         </p>
                       </div>
                     </div>
+                    {/* TODO: Implement secure, time-limited download URLs. Storing and serving
+                    static URLs is a security risk for digital products. The backend should
+                    generate a temporary, signed URL upon request. */}
                     <Button asChild size="sm" className="rounded-lg">
                       <Link
                         href={item.downloadUrl || "#"}
@@ -146,11 +172,11 @@ export function OrderSuccessContent() {
             your order details in your account.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4 pt-4 pb-6">
-            <Button asChild size="lg" className="rounded-xl shadow-md">
+            <Button asChild size="lg" className="rounded-lg shadow-md">
               <Link href="/shop">Continue Shopping</Link>
             </Button>
-            <Button asChild variant="outline" size="lg" className="rounded-xl">
-              <Link href="/account/orders">View My Orders</Link>
+            <Button asChild variant="outline" size="lg" className="rounded-lg">
+              <Link href="/account">View My Orders</Link>
             </Button>
           </div>
         </CardContent>

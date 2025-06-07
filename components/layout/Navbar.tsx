@@ -1,4 +1,10 @@
-"use client";
+/**
+ * @file Defines the main Navbar component for the application.
+ * This is a client component responsible for site-wide navigation, displaying user
+ * authentication status, and providing access to the theme toggle, cart, and user menu.
+ */
+
+"use-client";
 
 import Link from "next/link";
 import { Logo } from "./Logo";
@@ -29,17 +35,33 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { useSession, signIn, signOut } from "next-auth/react";
 
+/**
+ * Configuration for the main navigation links.
+ * Storing this in an array makes it easy to manage and render the navigation bar.
+ */
+// TODO: For a more dynamic site, consider fetching navigation links from a CMS
+// or a configuration API to allow non-developers to manage the site structure.
 const navLinks = [
   { href: "/", label: "Home", icon: <BookOpen className="h-4 w-4" /> },
   { href: "/shop", label: "Shop", icon: <BookOpen className="h-4 w-4" /> },
   { href: "/about", label: "About", icon: <Info className="h-4 w-4" /> },
 ];
 
+/**
+ * The primary navigation bar component for the website.
+ * It is responsive and adapts its layout for desktop and mobile views.
+ */
 export function Navbar() {
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const user = session?.user;
 
+  /**
+   * A reusable component to render the navigation links.
+   * This avoids code duplication between the desktop and mobile navigation menus.
+   * @param {object} props - The component props.
+   * @param {boolean} [props.isMobile=false] - If true, applies styles suitable for a mobile layout.
+   */
   const NavLinksContent = ({ isMobile = false }: { isMobile?: boolean }) => (
     <>
       {navLinks.map((link) => (
@@ -49,6 +71,7 @@ export function Navbar() {
           variant="ghost"
           className={cn(
             "font-medium",
+            // Apply active link styling based on the current pathname.
             pathname === link.href
               ? "text-primary"
               : "text-foreground/70 hover:text-foreground",
@@ -61,6 +84,7 @@ export function Navbar() {
           </Link>
         </Button>
       ))}
+      {/* Conditionally render the "Admin" link only for users with the 'admin' role. */}
       {user?.role === "admin" && (
         <Button
           asChild
@@ -73,6 +97,8 @@ export function Navbar() {
             isMobile ? "w-full justify-start text-lg py-4" : ""
           )}
         >
+          {/* TODO: Centralize application routes (e.g., '/admin') into a constants file
+          to improve maintainability and prevent magic strings. */}
           <Link href="/admin" className="flex items-center gap-2">
             {isMobile && <LayoutDashboard className="h-4 w-4" />}
             Admin
@@ -83,9 +109,11 @@ export function Navbar() {
   );
 
   return (
+    // The header uses sticky positioning and backdrop-blur for a modern "glassmorphism" effect.
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
       <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
         <Logo />
+        {/* Desktop Navigation: Hidden on smaller screens */}
         <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
           <NavLinksContent />
         </nav>
@@ -93,7 +121,9 @@ export function Navbar() {
           <CartIcon />
           <ThemeToggle />
 
+          {/* Handles the display of authentication status */}
           {status === "loading" && (
+            // Shows a skeleton loader while the session is being fetched, preventing layout shifts.
             <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
           )}
 
@@ -165,6 +195,7 @@ export function Navbar() {
             </DropdownMenu>
           )}
 
+          {/* Mobile Navigation: A hamburger menu that shows a Sheet on smaller screens */}
           <div className="md:hidden">
             <Sheet>
               <SheetTrigger asChild>
@@ -180,6 +211,7 @@ export function Navbar() {
                 <div className="flex flex-col space-y-2">
                   <NavLinksContent isMobile />
                   <Separator className="my-2" />
+                  {/* Authentication links within the mobile menu */}
                   {status === "authenticated" && user && (
                     <>
                       <Button

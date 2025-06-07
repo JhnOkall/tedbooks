@@ -1,44 +1,60 @@
-import { IBook } from "@/models/Book";
+/**
+ * @file This module contains data-fetching functions for interacting with the
+ * book-related API endpoints. It utilizes Next.js's extended `fetch` API for
+ * caching and revalidation strategies.
+ */
 
-// Helper function to get the base URL for API calls
-// This works on both server and client, and is configurable via environment variables
-function getBaseUrl() {
+import { IBook } from '@/models/Book';
+
+/**
+ * Retrieves the base URL for API calls.
+ * This utility function ensures that API requests are directed to the correct
+ * host, whether in a local development environment or a deployed production environment.
+ * It prioritizes the `NEXT_PUBLIC_BASE_URL` environment variable and falls back to localhost.
+ * @returns {string} The base URL for the application.
+ */
+function getBaseUrl(): string {
   return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 }
 
 /**
- * Fetches books that are marked as featured.
- * Uses Next.js's built-in fetch for server-side caching.
- * @returns A promise that resolves to an array of IBook objects.
+ * Fetches an array of books that are marked as "featured".
+ * This function is optimized for performance by caching the response for one hour
+ * using Next.js's Incremental Static Regeneration (ISR).
+ *
+ * @returns {Promise<IBook[]>} A promise that resolves to an array of featured books.
+ * Returns an empty array if the fetch fails or an error occurs.
  */
 export async function getFeaturedBooks(): Promise<IBook[]> {
   const baseUrl = getBaseUrl();
   try {
     const res = await fetch(`${baseUrl}/api/books?featured=true`, {
-      // Revalidate this data every hour (3600 seconds)
-      // This caches the result and prevents hitting the DB on every request.
+      // Revalidate this data at most once every hour (3600 seconds).
       next: { revalidate: 3600 },
     });
 
     if (!res.ok) {
-      // Log the error for debugging, but don't crash the page
+      // TODO: Implement a more robust logging service instead of console.error for production environments.
       console.error(`Failed to fetch featured books: ${res.statusText}`);
       return [];
     }
 
     return res.json();
   } catch (error) {
-    console.error("An error occurred in getFeaturedBooks:", error);
-    // Return an empty array on network or other errors to prevent page crash
+    console.error('An error occurred in getFeaturedBooks:', error);
+    // Gracefully handle network or other exceptions by returning an empty array.
     return [];
   }
 }
 
 /**
- * Fetches all books, with optional search query.
- * This is not cached by default as search results are dynamic.
- * @param searchQuery Optional string to search by title or author.
- * @returns A promise that resolves to an array of IBook objects.
+ * Fetches all books, optionally filtered by a search query.
+ * This fetch is not cached (`cache: 'no-store'`) to ensure that search results
+ * are always up-to-date and reflect the most current data.
+ *
+ * @param {string} [searchQuery] - An optional string to search against book titles or authors.
+ * @returns {Promise<IBook[]>} A promise that resolves to an array of books matching the criteria.
+ * Returns an empty array on failure.
  */
 export async function getAllBooks(searchQuery?: string): Promise<IBook[]> {
   const baseUrl = getBaseUrl();
@@ -47,11 +63,10 @@ export async function getAllBooks(searchQuery?: string): Promise<IBook[]> {
   if (searchQuery) {
     url += `?search=${encodeURIComponent(searchQuery)}`;
   }
-  
+
   try {
     const res = await fetch(url, {
-      // Use 'no-store' because the result depends on the search query
-      // and should always be fresh.
+      // Opt out of caching to ensure dynamic search results are always fresh.
       cache: 'no-store',
     });
 
@@ -59,33 +74,40 @@ export async function getAllBooks(searchQuery?: string): Promise<IBook[]> {
       console.error(`Failed to fetch books: ${res.statusText}`);
       return [];
     }
-    
+
     return res.json();
   } catch (error) {
-    console.error("An error occurred in getAllBooks:", error);
+    console.error('An error occurred in getAllBooks:', error);
     return [];
   }
 }
 
 /**
- * Fetches a single book by its ID from the API.
- * Caches the result to speed up subsequent requests.
- * @param id The MongoDB _id of the book.
- * @returns A promise that resolves to the IBook object or null if not found.
+ * Fetches a single book by its unique identifier.
+ * The result is cached for one hour to improve performance for frequently accessed books.
+ *
+ * @param {string} id - The unique MongoDB `_id` of the book to retrieve.
+ * @returns {Promise<IBook | null>} A promise that resolves to the book object,
+ * or `null` if the book is not found or an error occurs.
  */
 export async function getBookById(id: string): Promise<IBook | null> {
   const baseUrl = getBaseUrl();
   try {
     const res = await fetch(`${baseUrl}/api/books/${id}`, {
-      // Cache this book's data for an hour
+      // Cache this specific book's data for one hour.
       next: { revalidate: 3600 },
     });
 
+    if (res.status === 404) {
+      return null; // Handle "Not Found" gracefully.
+    }
+
     if (!res.ok) {
-      // Handles 404 Not Found from the API
+      // For other errors, log the issue and return null.
+      console.error(`Failed to fetch book ${id}: ${res.statusText}`);
       return null;
     }
-    
+
     return res.json();
   } catch (error) {
     console.error(`Error fetching book with ID ${id}:`, error);
@@ -94,29 +116,46 @@ export async function getBookById(id: string): Promise<IBook | null> {
 }
 
 /**
- * Fetches other books from the same category to show as "related".
- * @param book The main book object to find related books for.
- * @returns A promise that resolves to an array of related IBook objects.
+ * Fetches a list of books from the same category as a given book, to be used as
+ * "related" or "recommended" products.
+ *
+ * @param {IBook} book - The primary book object used to determine the category.
+ * @returns {Promise<IBook[]>} A promise that resolves to an array of up to 4 related books,
+ * excluding the original book. Returns an empty array on failure.
  */
 export async function getRelatedBooks(book: IBook): Promise<IBook[]> {
   if (!book.category) return [];
 
   const baseUrl = getBaseUrl();
   try {
-    const res = await fetch(`${baseUrl}/api/books?category=${encodeURIComponent(book.category)}`, {
-      next: { revalidate: 3600 },
-    });
-    
-    if (!res.ok) return [];
-    
+    // TODO: Optimize this by enhancing the API. The API endpoint should support
+    // excluding an ID and limiting the results directly (e.g., `/api/books?category=...&excludeId=...&limit=4`)
+    // to avoid over-fetching and filtering on the client-side.
+    const res = await fetch(
+      `${baseUrl}/api/books?category=${encodeURIComponent(book.category)}`,
+      {
+        next: { revalidate: 3600 }, // Cache category results for an hour.
+      }
+    );
+
+    if (!res.ok) {
+      console.error(
+        `Failed to fetch related books for category ${book.category}: ${res.statusText}`
+      );
+      return [];
+    }
+
     const booksInCategory: IBook[] = await res.json();
 
-    // Filter out the current book from the list and take up to 4 others
+    // Filter out the current book from the results and limit to the first 4.
     return booksInCategory
-      .filter(relatedBook => relatedBook._id !== book._id)
+      .filter((relatedBook) => relatedBook._id !== book._id)
       .slice(0, 4);
   } catch (error) {
-    console.error(`Error fetching related books for category ${book.category}:`, error);
+    console.error(
+      `Error fetching related books for category ${book.category}:`,
+      error
+    );
     return [];
   }
 }
