@@ -113,7 +113,6 @@ PAYHERO_WALLET_CHANNEL_ID='your_payhero_wallet_channel_id'
 # PayHero SDK Configuration (for client-side button)
 NEXT_PUBLIC_PAYHERO_LIPWA_URL='your_payhero_lipwa_url'
 NEXT_PUBLIC_PAYHERO_CHANNEL_ID='your_payhero_sdk_channel_id'
-NEXT_PUBLIC_PAYHERO_BUTTON_COLOR='#00a884'
 ```
 
 > **Note:** To get the `AUTH_SECRET`, run `npx auth secret` in your terminal.

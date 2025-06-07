@@ -57,20 +57,10 @@ export default function TermsAndConditionsPage(): JSX.Element {
             {/* TODO: The "Last Updated" date is hardcoded. If this page becomes dynamic,
             this date should be populated from the `updatedAt` field of the fetched content object. */}
             <p className="text-center text-muted-foreground pt-2">
-              Last Updated: October 26, 2023
+              Last Updated: 7th June, 2025
             </p>
           </CardHeader>
           <CardContent className="space-y-8">
-            {/* A disclaimer is included to clarify that this is a template and not legal advice. */}
-            <div className="p-4 bg-yellow-100 dark:bg-yellow-900/30 border-l-4 border-yellow-500 text-yellow-800 dark:text-yellow-200 rounded-r-lg">
-              <p className="font-bold">Disclaimer:</p>
-              <p>
-                This is a template document. For a legally binding Terms and
-                Conditions for your business, you must consult with a qualified
-                legal professional.
-              </p>
-            </div>
-
             <TermSection title="1. Agreement to Terms">
               <p>
                 By accessing and using the TedBooks website (the "Service"), you

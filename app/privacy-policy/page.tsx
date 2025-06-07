@@ -57,7 +57,7 @@ export default function PrivacyPolicyPage(): JSX.Element {
             {/* TODO: The "Last Updated" date is hardcoded. If this page becomes dynamic,
             this date should be populated from the `updatedAt` field of the fetched content object. */}
             <p className="text-center text-muted-foreground pt-2">
-              Last Updated: 7th June, 2023
+              Last Updated: 7th June, 2024
             </p>
           </CardHeader>
           <CardContent className="space-y-8">
