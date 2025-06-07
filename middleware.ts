@@ -1,10 +1,5 @@
-import { auth } from '@/auth';
+import { auth } from '@/auth'; 
 import { NextResponse } from 'next/server';
-
-// Explicitly export a 'runtime' variable to force the Node.js runtime.
-// This is required because auth logic (which is imported here)
-// uses Mongoose, which is not compatible with the default Edge runtime.
-export const runtime = 'nodejs';
 
 export default auth((req) => {
   const { nextUrl } = req;
@@ -15,12 +10,17 @@ export default auth((req) => {
   const pathname = nextUrl.pathname;
 
   // --- Admin Route Protection ---
+  // If the user tries to access any /admin path and is not an admin
   if (pathname.startsWith('/admin') && !isAdmin) {
+    // Redirect them to the homepage or an "unauthorized" page
     return NextResponse.redirect(new URL('/', nextUrl));
   }
 
   // --- Authenticated User Route Protection ---
+  // If the user tries to access /account or /order and is not logged in
   if ((pathname.startsWith('/account') || pathname.startsWith('/order')) && !isLoggedIn) {
+    // Redirect them to the sign-in page, and after they log in,
+    // send them back to the page they were trying to access.
     const callbackUrl = encodeURIComponent(pathname);
     return NextResponse.redirect(new URL(`/api/auth/signin?callbackUrl=${callbackUrl}`, nextUrl));
   }
@@ -30,10 +30,12 @@ export default auth((req) => {
 });
 
 // This config specifies which paths the middleware should run on.
+// This is an optimization to avoid running middleware on every request.
 export const config = {
   matcher: [
     '/admin/:path*',
     '/account/:path*',
     '/order/:path*',
+    // Add other protected routes here if needed
   ],
 };
