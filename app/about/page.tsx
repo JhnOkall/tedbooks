@@ -3,6 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ReactMarkdown from "react-markdown";
 import { ISiteContent } from "@/models/SiteContent";
 
+// Force dynamic rendering
+export const dynamic = "force-dynamic";
+
 // --- Data Fetching Function ---
 // Fetches content for the 'about' page from our API.
 // 'no-store' ensures we always get the latest version from the DB.
