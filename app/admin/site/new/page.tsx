@@ -3,7 +3,7 @@
  * It provides a form for creating content with a unique key, title, and body.
  */
 
-"use-client";
+"use client";
 
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";

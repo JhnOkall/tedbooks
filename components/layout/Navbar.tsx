@@ -4,7 +4,7 @@
  * authentication status, and providing access to the theme toggle, cart, and user menu.
  */
 
-"use-client";
+"use client";
 
 import Link from "next/link";
 import { Logo } from "./Logo";
