@@ -288,46 +288,55 @@ function RecentTransactionsTable({ data }: { data: TransactionData | null }) {
     <Card className="rounded-xl shadow-lg">
       <CardHeader>
         <CardTitle>Recent PayHero Transactions</CardTitle>
+        <CardDescription>
+          Your latest financial movements from PayHero.
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Type</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data?.transactions.length ? (
-              data.transactions.map((tx) => (
-                <TableRow key={tx.id}>
-                  <TableCell className="font-medium capitalize">
-                    {tx.transaction_type.replace("_", " ")}
-                  </TableCell>
-                  <TableCell>{tx.description}</TableCell>
-                  <TableCell>
-                    {new Date(tx.created_at).toLocaleString()}
-                  </TableCell>
-                  <TableCell
-                    className={`text-right font-semibold ${
-                      tx.amount > 0 ? "text-green-600" : "text-red-600"
-                    }`}
-                  >
-                    {formatCurrency(tx.amount)}
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="hidden sm:table-cell">Type</TableHead>
+                <TableHead className="hidden sm:table-cell">
+                  Description
+                </TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data?.transactions.length ? (
+                data.transactions.map((tx) => (
+                  <TableRow key={tx.id}>
+                    <TableCell className="hidden sm:table-cell font-medium capitalize">
+                      {tx.transaction_type.replace("_", " ")}
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      {tx.description}
+                    </TableCell>
+                    <TableCell>
+                      {new Date(tx.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell
+                      className={`text-right font-semibold ${
+                        tx.amount > 0 ? "text-green-600" : "text-red-600"
+                      }`}
+                    >
+                      {formatCurrency(tx.amount)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center h-24">
+                    No recent transactions found.
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center h-24">
-                  No recent transactions found.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
     </Card>
   );
