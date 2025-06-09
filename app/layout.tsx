@@ -41,6 +41,19 @@ export default function RootLayout({
     // to prevent a React warning about server/client mismatch for the theme attribute.
     <html lang="en" suppressHydrationWarning>
       <head>
+      <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                  for (let registration of registrations) {
+                    registration.unregister();
+                  }
+                });
+              }
+            `,
+          }}
+          />
         {/*
           TODO: [Performance] Replace these manual font links with the `next/font` package.
           Using `next/font` will automatically optimize fonts, host them with your deployment,
