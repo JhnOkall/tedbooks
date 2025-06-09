@@ -2,7 +2,7 @@
 
 TedBooks is a modern, full-stack e-commerce application designed for selling digital books. Built with the Next.js App Router, it features a complete user authentication system, a powerful admin dashboard for managing content, and a seamless payment integration with PayHero.
 
-![TedBooks Screenshot (Conceptual)](https://75rfypg2otkow6jl.public.blob.vercel-storage.com/preview-lUPOBvlPjibhCbhd6SRYZgwFaI7aGL)
+![TedBooks Screenshot (Conceptual)](https://75rfypg2otkow6jl.public.blob.vercel-storage.com/Screenshot%202025-06-07%20154800-QlM51gxoVZrvCvPg3fcI3wgB1pkegA.png)
 
 ## Features
 
