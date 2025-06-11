@@ -347,7 +347,9 @@ function RecentTransactionsTable({ data }: { data: TransactionData | null }) {
                     <TableCell className="hidden sm:table-cell font-medium capitalize">
                       {tx.transaction_type.replace(/_/g, " ")}
                     </TableCell>
-                    <TableCell>{tx.description}</TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      {tx.description}
+                    </TableCell>
                     <TableCell>
                       {new Date(tx.created_at).toLocaleDateString()}
                     </TableCell>

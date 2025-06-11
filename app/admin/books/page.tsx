@@ -160,10 +160,19 @@ export default function ManageBooksPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[80px]">Image</TableHead>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Author</TableHead>
-                      <TableHead className="text-right">Price</TableHead>
+                      {/* Using w-[60px] on image and hidden on some columns helps control layout on mobile */}
+                      <TableHead className="w-[60px] sm:w-[80px]">
+                        Image
+                      </TableHead>
+                      <TableHead className="min-w-[150px]">Title</TableHead>
+                      {/* Hide Author on extra-small screens */}
+                      <TableHead className="hidden md:table-cell">
+                        Author
+                      </TableHead>
+                      {/* Hide Price on small screens and below */}
+                      <TableHead className="hidden sm:table-cell text-right">
+                        Price
+                      </TableHead>
                       <TableHead className="text-center">Featured</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -180,12 +189,17 @@ export default function ManageBooksPage() {
                             className="rounded object-cover aspect-[2/3]"
                           />
                         </TableCell>
-                        <TableCell className="font-medium">
+                        {/* On small screens, truncate long titles. On larger screens, allow text to wrap normally. */}
+                        <TableCell className="font-medium max-w-[150px] truncate sm:max-w-xs md:whitespace-normal">
                           {book.title}
                         </TableCell>
-                        <TableCell>{book.author}</TableCell>
+                        {/* Hide Author on extra-small screens to match the header */}
+                        <TableCell className="hidden md:table-cell">
+                          {book.author}
+                        </TableCell>
                         {/* TODO: The currency 'Ksh.' is hardcoded. Use a centralized currency formatter. */}
-                        <TableCell className="text-right">
+                        {/* Hide Price on small screens and below to match the header */}
+                        <TableCell className="hidden sm:table-cell text-right">
                           Ksh. {book.price.toFixed(2)}
                         </TableCell>
                         <TableCell className="text-center">
