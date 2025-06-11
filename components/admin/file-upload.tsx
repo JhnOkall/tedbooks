@@ -183,9 +183,7 @@ export function FileUpload({
               Click to upload {label.toLowerCase()}
             </p>
             {/* UPDATED: Help text now shows the max size */}
-            <p className="text-xs text-gray-400">
-              {helpText} (Max: {maxSizeMb}MB)
-            </p>
+            <p className="text-xs text-gray-400">{helpText}</p>
           </div>
         ) : (
           <div className="space-y-2">
