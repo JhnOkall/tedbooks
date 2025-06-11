@@ -52,6 +52,14 @@ const nextConfig: NextConfig = {
         // is reconfigured, this value will need to be updated. Consider moving this to an environment
         // variable for easier management across different environments.
       },
+      {
+        // Whitelists the Cloudinary CDN, which is now used for hosting production assets like book cover images.
+        // This allows `next/image` to securely fetch and optimize images from your Cloudinary account.
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
 };
