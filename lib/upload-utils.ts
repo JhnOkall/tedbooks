@@ -71,8 +71,8 @@ export const uploadFileWithProgress = async (
   onProgress(10); // Indicate that signing is complete
 
   // === Step 2: Upload the file directly to Cloudinary using the signature ===
-  const { signature, timestamp, api_key, cloud_name } = signatureResponse;
-  const url = `https://api.cloudinary.com/v1_1/${cloud_name}/${resource_type}/upload`;
+  const { signature, timestamp, api_key, cloud_name, resource_type: returnedResourceType } = signatureResponse;
+  const url = `https://api.cloudinary.com/v1_1/${cloud_name}/${returnedResourceType}/upload`;
 
   const formData = new FormData();
   formData.append('file', file);
@@ -81,13 +81,15 @@ export const uploadFileWithProgress = async (
   formData.append('signature', signature);
   formData.append('folder', folder);
   formData.append('public_id', public_id);
-  formData.append('resource_type', resource_type); 
+  
+  // FIXED: Don't append resource_type to form data - it's already in the URL
+  // The resource_type is specified in the upload URL endpoint, not as a form parameter
+  
   // For raw files, we want to preserve the original filename for download
   if (resource_type === 'raw') {
     formData.append('filename_override', file.name);
     formData.append('use_filename', 'true'); 
   }
-
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();

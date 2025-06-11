@@ -46,11 +46,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Step 2: Prepare parameters for the signature.
     const timestamp = Math.round(new Date().getTime() / 1000);
 
+    // FIXED: Only include parameters that will be sent in the upload request
+    // resource_type should NOT be included in paramsToSign for signed uploads
     const paramsToSign = {
       timestamp,
       public_id,
       folder,
-      resource_type,
       // You can add other upload parameters here, e.g., transformations
       // eager: 'w_400,h_300,c_pad|w_260,h_200,c_crop',
     };
@@ -68,6 +69,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       timestamp,
       api_key: process.env.CLOUDINARY_API_KEY,
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      // Return the resource_type so client knows which endpoint to use
+      resource_type,
     });
   } catch (error) {
     console.error('Error generating Cloudinary signature:', error);
