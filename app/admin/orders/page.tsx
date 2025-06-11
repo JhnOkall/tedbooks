@@ -170,69 +170,87 @@ export default function ManageOrdersPage() {
               No orders found.
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order ID</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-center">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {/* TODO: Implement pagination for the orders table to handle a large number of records efficiently. */}
-                {orders.map((order) => (
-                  <TableRow key={order._id}>
-                    <TableCell className="font-medium">
-                      {order.customId}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(order.date).toLocaleDateString()}
-                    </TableCell>
-                    {/* The API populates `userId` with the user object, but we cast to `any` for simplicity.
-                        A better approach would be to extend the `Order` type to reflect the populated field. */}
-                    <TableCell>
-                      {(order.userId as any)?.name || "N/A"}
-                    </TableCell>
-                    {/* TODO: The currency 'Ksh.' is hardcoded. Use a centralized currency formatter. */}
-                    <TableCell className="text-right">
-                      Ksh. {order.totalAmount.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant={getStatusBadgeVariant(order.status)}>
-                        {order.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center w-48">
-                      {/* Show a loader in place of the select menu while this specific order is updating. */}
-                      {updatingOrderId === order._id ? (
-                        <div className="flex justify-center items-center">
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                        </div>
-                      ) : (
-                        <Select
-                          defaultValue={order.status}
-                          onValueChange={(value: OrderStatus) =>
-                            handleStatusChange(order._id, value)
-                          }
-                        >
-                          <SelectTrigger className="h-9">
-                            <SelectValue placeholder="Change status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Pending">Pending</SelectItem>
-                            <SelectItem value="Completed">Completed</SelectItem>
-                            <SelectItem value="Cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    </TableCell>
+            // The overflow-x-auto div is a good safety net for responsiveness
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[120px]">Order ID</TableHead>
+                    {/* Hide Date on smaller screens */}
+                    <TableHead className="hidden md:table-cell">Date</TableHead>
+                    {/* Hide Customer on extra-small screens */}
+                    <TableHead className="hidden sm:table-cell">
+                      Customer
+                    </TableHead>
+                    {/* Hide Total on extra-small screens */}
+                    <TableHead className="hidden sm:table-cell text-right">
+                      Total
+                    </TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead className="text-center">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {/* TODO: Implement pagination for the orders table to handle a large number of records efficiently. */}
+                  {orders.map((order) => (
+                    <TableRow key={order._id}>
+                      {/* Truncate long order IDs on small screens */}
+                      <TableCell className="font-medium max-w-[120px] truncate">
+                        {order.customId}
+                      </TableCell>
+                      {/* Hide Date on smaller screens */}
+                      <TableCell className="hidden md:table-cell">
+                        {new Date(order.date).toLocaleDateString()}
+                      </TableCell>
+                      {/* The API populates `userId` with the user object, but we cast to `any` for simplicity.
+                        A better approach would be to extend the `Order` type to reflect the populated field. */}
+                      {/* Hide Customer on extra-small screens */}
+                      <TableCell className="hidden sm:table-cell">
+                        {(order.userId as any)?.name || "N/A"}
+                      </TableCell>
+                      {/* TODO: The currency 'Ksh.' is hardcoded. Use a centralized currency formatter. */}
+                      {/* Hide Total on extra-small screens */}
+                      <TableCell className="hidden sm:table-cell text-right">
+                        Ksh. {order.totalAmount.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant={getStatusBadgeVariant(order.status)}>
+                          {order.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center w-[150px]">
+                        {/* Show a loader in place of the select menu while this specific order is updating. */}
+                        {updatingOrderId === order._id ? (
+                          <div className="flex justify-center items-center">
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                          </div>
+                        ) : (
+                          <Select
+                            defaultValue={order.status}
+                            onValueChange={(value: OrderStatus) =>
+                              handleStatusChange(order._id, value)
+                            }
+                          >
+                            <SelectTrigger className="h-9">
+                              <SelectValue placeholder="Change status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Pending">Pending</SelectItem>
+                              <SelectItem value="Completed">
+                                Completed
+                              </SelectItem>
+                              <SelectItem value="Cancelled">
+                                Cancelled
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

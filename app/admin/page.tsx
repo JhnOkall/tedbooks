@@ -335,7 +335,9 @@ function RecentTransactionsTable({ data }: { data: TransactionData | null }) {
             <TableHeader>
               <TableRow>
                 <TableHead className="hidden sm:table-cell">Type</TableHead>
-                <TableHead>Description</TableHead>
+                <TableHead className="hidden sm:table-cell">
+                  Description
+                </TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
               </TableRow>

@@ -45,24 +45,27 @@ export function BookCard({ book }: BookCardProps): JSX.Element {
 
   return (
     // Wraps the card in a motion component for a subtle hover animation.
+    // REMOVED: `h-full` to allow the card to size based on its content.
     <motion.div
       whileHover={{ y: -5, scale: 1.03 }}
       transition={{ type: "spring", stiffness: 300 }}
-      className="h-full"
     >
-      <Card className="h-full flex flex-col overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300">
+      {/* REMOVED: `h-full` to prevent vertical stretching.
+          ADDED: `group` to use for the image hover effect, which is cleaner. */}
+      <Card className="flex flex-col overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 group">
         <CardHeader className="p-0">
-          {/* The book cover image, linked to the book's detail page. */}
+          {/* The book cover image, linked to the book's detail page.
+              ADDED: `rounded-t-lg` to make the image flush with the top corners of the card. */}
           <Link
             href={`/book/${book._id}`}
-            className="block aspect-[2/3] relative overflow-hidden group"
+            className="block aspect-[2/3] relative overflow-hidden rounded-t-lg"
             aria-label={`View details for ${book.title}`}
           >
             <Image
               src={book.coverImage}
               alt={`Cover of ${book.title}`}
               fill
-              sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               className="object-cover transition-transform duration-300 group-hover:scale-105"
             />
           </Link>
@@ -78,6 +81,7 @@ export function BookCard({ book }: BookCardProps): JSX.Element {
             </Link>
           </CardTitle>
           <p className="text-sm text-muted-foreground mb-2">{book.author}</p>
+          {/* Using `flex-grow` on the description helps align footers in a row if descriptions have varying lengths */}
           <p className="text-xs text-foreground/80 line-clamp-3 flex-grow">
             {book.description}
           </p>
