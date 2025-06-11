@@ -46,15 +46,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Step 2: Prepare parameters for the signature.
     const timestamp = Math.round(new Date().getTime() / 1000);
 
-    // FIXED: Only include parameters that will be sent in the upload request
-    // resource_type should NOT be included in paramsToSign for signed uploads
-    const paramsToSign = {
+    // Build parameters based on resource type
+    const paramsToSign: Record<string, any> = {
       timestamp,
       public_id,
       folder,
-      // You can add other upload parameters here, e.g., transformations
-      // eager: 'w_400,h_300,c_pad|w_260,h_200,c_crop',
     };
+
+    // For raw files (non-images), include use_filename parameter
+    if (resource_type === 'raw') {
+      paramsToSign.use_filename = true;
+    }
 
     // Step 3: Generate the signature on the server-side.
     const signature = cloudinary.utils.api_sign_request(
@@ -71,6 +73,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
       // Return the resource_type so client knows which endpoint to use
       resource_type,
+      // Return the parameters that were signed so client knows what to include
+      signed_params: paramsToSign,
     });
   } catch (error) {
     console.error('Error generating Cloudinary signature:', error);
