@@ -10,13 +10,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Book } from "@/types";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardTitle } from "@/components/ui/card";
 import { ShoppingCart } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { motion } from "framer-motion";
@@ -45,37 +39,33 @@ export function BookCard({ book }: BookCardProps): JSX.Element {
 
   return (
     // Wraps the card in a motion component for a subtle hover animation.
-    // REMOVED: `h-full` to allow the card to size based on its content.
     <motion.div
       whileHover={{ y: -5, scale: 1.03 }}
       transition={{ type: "spring", stiffness: 300 }}
     >
-      {/* REMOVED: `h-full` to prevent vertical stretching.
-          ADDED: `group` to use for the image hover effect, which is cleaner. */}
+      {/* Removed CardHeader entirely and moved image directly into Card */}
       <Card className="flex flex-col overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 group">
-        <CardHeader className="p-0">
-          {/* The book cover image, linked to the book's detail page.
-              ADDED: `rounded-t-lg` to make the image flush with the top corners of the card. */}
-          <Link
-            href={`/book/${book._id}`}
-            className="block aspect-[2/3] relative overflow-hidden rounded-t-lg"
-            aria-label={`View details for ${book.title}`}
-          >
-            <Image
-              src={book.coverImage}
-              alt={`Cover of ${book.title}`}
-              fill
-              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              className="object-cover transition-transform duration-300 group-hover:scale-105"
-            />
-          </Link>
-        </CardHeader>
+        {/* The book cover image, linked to the book's detail page.
+            Now directly inside Card with no CardHeader wrapper */}
+        <Link
+          href={`/book/${book._id}`}
+          className="block aspect-[2/3] relative overflow-hidden rounded-t-lg"
+          aria-label={`View details for ${book.title}`}
+        >
+          <Image
+            src={book.coverImage}
+            alt={`Cover of ${book.title}`}
+            fill
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        </Link>
 
         <CardContent className="p-4 flex-grow flex flex-col">
           <CardTitle className="text-lg font-semibold leading-tight mb-1">
             <Link
               href={`/book/${book._id}`}
-              className="hover:text-primary transition-colors"
+              className="hover:text-primary transition-colors line-clamp-2"
             >
               {book.title}
             </Link>
