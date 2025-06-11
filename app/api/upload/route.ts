@@ -1,18 +1,61 @@
 /**
- * @file This file defines the API route for generating secure upload URLs for Vercel Blob.
- * It follows the recommended client-side upload pattern to bypass serverless function body size limits.
- * This is a protected, admin-only endpoint.
+ * @file This file defines the API route handler for uploading files to Vercel Blob storage.
+ * It is a protected, admin-only endpoint.
  */
 
-import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
-import { NextResponse } from 'next/server';
+import { put, PutBlobResult } from '@vercel/blob';
+import { NextResponse, NextRequest } from 'next/server';
 import { auth } from '@/auth';
+import { customAlphabet } from 'nanoid'; // A great library for short, unique IDs
 
-// This is the new, recommended way to handle uploads.
-// The client will send a request to this endpoint, and we'll return
-// a short-lived token that allows the client to upload directly to Vercel Blob.
-export async function POST(request: Request): Promise<NextResponse> {
-  // Step 1: Authenticate the user and check for admin role.
+// Using nanoid for shorter, URL-friendly unique IDs instead of UUIDs.
+const nanoid = customAlphabet(
+  '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
+  12
+);
+
+/**
+ * Configuration for different upload types.
+ * Defines allowed content types and maximum file sizes.
+ */
+const UPLOAD_CONFIG = {
+  cover: {
+    path: 'images/covers/',
+    allowedTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+    maxSizeMB: 10, // 10 MB
+  },
+  book: {
+    path: 'books/',
+    allowedTypes: ['application/pdf', 'application/epub+zip'],
+    maxSizeMB: 50, // 50 MB
+  },
+};
+
+/**
+ * Sanitizes and formats a filename to be URL-friendly (a "slug").
+ * Example: "The Great Gatsby!" -> "the-great-gatsby"
+ * @param filename The original filename.
+ * @returns A URL-safe string.
+ */
+function slugify(filename: string): string {
+  return filename
+    .toLowerCase()
+    .replace(/\.[^/.]+$/, '') // Remove file extension
+    .replace(/[^a-z0-9\s-]/g, '') // Remove non-alphanumeric characters except spaces and hyphens
+    .trim()
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-'); // Replace multiple hyphens with a single one
+}
+
+/**
+ * Handles POST requests to upload a file.
+ * The upload type and original filename are passed as URL search parameters.
+ *
+ * @param {NextRequest} request - The incoming HTTP request.
+ * @returns {Promise<NextResponse>} A promise that resolves to the API response.
+ */
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  // Step 1: Authenticate the session and verify admin privileges.
   const session = await auth();
   if (!session || session.user?.role !== 'admin') {
     return NextResponse.json(
@@ -21,65 +64,97 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  // Step 2: Parse the request body.
-  // The `handleUpload` function from `@vercel/blob/client` expects a specific JSON structure.
-  const body = (await request.json()) as HandleUploadBody;
+  // Step 2: Extract parameters and validate request body.
+  const { searchParams } = new URL(request.url);
+  const originalFilename = searchParams.get('originalFilename');
+  const uploadType = searchParams.get('uploadType') as keyof typeof UPLOAD_CONFIG;
 
+  if (!originalFilename) {
+    return NextResponse.json(
+      { message: '`originalFilename` search parameter is required.' },
+      { status: 400 }
+    );
+  }
+
+  if (!uploadType || !UPLOAD_CONFIG[uploadType]) {
+    return NextResponse.json(
+      {
+        message: `Invalid 'uploadType'. Must be one of: ${Object.keys(
+          UPLOAD_CONFIG
+        ).join(', ')}`,
+      },
+      { status: 400 }
+    );
+  }
+
+  if (!request.body) {
+    return NextResponse.json(
+      { message: 'No file content was provided in the request body.' },
+      { status: 400 }
+    );
+  }
+
+  // Step 3: Validate file type and size based on configuration.
+  const config = UPLOAD_CONFIG[uploadType];
+  const contentType = request.headers.get('content-type');
+  const contentLength = request.headers.get('content-length');
+
+  if (!contentType || !config.allowedTypes.includes(contentType)) {
+    return NextResponse.json(
+      {
+        message: `Invalid file type. Allowed types for '${uploadType}' are: ${config.allowedTypes.join(
+          ', '
+        )}`,
+      },
+      { status: 415 } // Unsupported Media Type
+    );
+  }
+
+  if (contentLength && parseInt(contentLength, 10) > config.maxSizeMB * 1024 * 1024) {
+    return NextResponse.json(
+      { message: `File size exceeds the ${config.maxSizeMB}MB limit.` },
+      { status: 413 } // Payload Too Large
+    );
+  }
+
+  // Step 4: Generate a secure, unique pathname for storage.
+  const fileExtension = originalFilename.split('.').pop() || '';
+  let finalPathname: string;
+
+  if (uploadType === 'cover') {
+    // For images: Generate a unique name to prevent collisions.
+    const uniqueId = nanoid();
+    finalPathname = `${config.path}${uniqueId}.${fileExtension}`;
+  } else {
+    // For books: Create a clean, readable "slug" for the filename.
+    const slug = slugify(originalFilename);
+    finalPathname = `${config.path}${slug}.${fileExtension}`;
+  }
+
+  // Step 5: Stream the file to Vercel Blob storage.
   try {
-    // Step 3: Use `handleUpload` to generate the secure upload token.
-    // It takes care of all the Vercel Blob API interactions.
-    const jsonResponse = await handleUpload({
-      body,
-      request,
-      // The `onBeforeGenerateToken` callback is crucial for security.
-      // It's where we define the path for the upload and any security checks.
-      onBeforeGenerateToken: async (
-        pathname: string,
-        /* clientPayload?: string, */
-      ) => {
-        // Here, you can add any metadata or logic you need.
-        // For example, we can prefix the pathname to organize files.
-        // The `pathname` will be the original filename from the client.
-
-        // IMPORTANT: We're not using the full API from your original example
-        // (like slugify or nanoid) here because the client-side `upload` function
-        // automatically adds a unique suffix to prevent overwrites, which is generally safer.
-        // Let's organize files into 'covers/' and 'books/' folders.
-        const { searchParams } = new URL(request.url);
-        const uploadType = searchParams.get('uploadType');
-
-        let finalPathname = pathname;
-        if (uploadType === 'cover') {
-            finalPathname = `images/covers/${pathname}`;
-        } else if (uploadType === 'book') {
-            finalPathname = `books/${pathname}`;
-        }
-
-        return {
-          allowedContentTypes:
-            uploadType === 'cover'
-              ? ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
-              : ['application/pdf', 'application/epub+zip'],
-          pathname: finalPathname,
-          // You can add more security checks here if needed, e.g., based on clientPayload.
-        };
-      },
-      // The `onUploadCompleted` callback can be used for post-processing,
-      // like updating a database, but we'll handle that on the client side for this use case.
-      onUploadCompleted: async ({ blob, tokenPayload }) => {
-        // console.log('blob upload completed', blob, tokenPayload);
-        // You can perform database operations here if you want.
-      },
+    const blob = await put(finalPathname, request.body, {
+      access: 'public',
+      // We are generating a unique/sanitized name, so we don't need Vercel's random suffix.
+      addRandomSuffix: false,
+      // Pass the original content type to the blob storage.
+      contentType: contentType,
+      // For books, set Content-Disposition to ensure the browser prompts a download
+      // with the original, human-readable filename.
+      ...(uploadType === 'book' && {
+        contentDisposition: `attachment; filename="${originalFilename}"`,
+      }),
     });
 
-    // Step 4: Return the JSON response generated by `handleUpload`.
-    // This response contains the upload URL and token for the client.
-    return NextResponse.json(jsonResponse);
+    // Step 6: On success, return the blob details.
+    return NextResponse.json(blob);
+  } catch (error: any) {
+    // In a real production app, integrate a dedicated logging service (e.g., Sentry, Logtail).
+    console.error('Error uploading to Vercel Blob:', error);
 
-  } catch (error) {
-    console.error('Error handling upload token generation:', error);
+    // Return a generic error message to the client to avoid leaking implementation details.
     return NextResponse.json(
-      { message: 'An internal error occurred.' },
+      { message: 'An internal error occurred during file upload.' },
       { status: 500 }
     );
   }
