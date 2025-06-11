@@ -29,8 +29,9 @@ interface FileUploadProps {
   onUploadComplete: (url: string) => void;
   onRemove: () => void;
   disabled?: boolean;
-  initialUrl?: string | null; // <-- NEW: To display the existing file/image
-  initialFileName?: string; // <-- NEW: To display the existing file name
+  initialUrl?: string | null;
+  initialFileName?: string;
+  maxSizeMb?: number; // <-- NEW: To enforce a file size limit, defaults to 10MB
 }
 
 interface UploadState {
@@ -46,7 +47,7 @@ interface UploadState {
 
 /**
  * A reusable client component for handling file uploads with previews and progress.
- * Can display an initial file/image for edit forms.
+ * Can display an initial file/image for edit forms and enforce a file size limit.
  */
 export function FileUpload({
   label,
@@ -58,6 +59,7 @@ export function FileUpload({
   disabled = false,
   initialUrl = null,
   initialFileName = "File",
+  maxSizeMb = 10, // <-- NEW: Default max size set to 10MB
 }: FileUploadProps) {
   const [uploadState, setUploadState] = useState<UploadState>({
     file: null,
@@ -180,7 +182,10 @@ export function FileUpload({
             <p className="text-sm text-gray-600 mb-2">
               Click to upload {label.toLowerCase()}
             </p>
-            <p className="text-xs text-gray-400">{helpText}</p>
+            {/* UPDATED: Help text now shows the max size */}
+            <p className="text-xs text-gray-400">
+              {helpText} (Max: {maxSizeMb}MB)
+            </p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -263,7 +268,20 @@ export function FileUpload({
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) handleFileSelect(file);
+          if (!file) return;
+
+          // <-- NEW: Enforce file size limit before handling the file
+          const MAX_FILE_SIZE_BYTES = maxSizeMb * 1024 * 1024;
+          if (file.size > MAX_FILE_SIZE_BYTES) {
+            toast.error(`File size cannot exceed ${maxSizeMb}MB.`);
+            // Reset the input so the user can select another file
+            if (fileInputRef.current) {
+              fileInputRef.current.value = "";
+            }
+            return;
+          }
+
+          handleFileSelect(file);
         }}
         disabled={disabled || uploadState.isUploading}
       />

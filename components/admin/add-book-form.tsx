@@ -184,7 +184,7 @@ export function AddBookForm() {
             label="Book File"
             uploadType="file"
             acceptedFileTypes=".pdf,.epub"
-            helpText="PDF, EPUB (max 100MB)"
+            helpText="PDF, EPUB (max 10MB)"
             onUploadComplete={(url) => setBookFileUrl(url)}
             onRemove={() => setBookFileUrl(null)}
             disabled={isSubmitting}
