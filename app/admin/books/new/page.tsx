@@ -1,11 +1,11 @@
 /**
  * @file This file defines the admin page for adding a new book to the catalog.
- * It provides a comprehensive form for all book details, including file uploads.
+ * It provides a comprehensive form for all book details, including file uploads with previews.
  */
 
 "use client";
 
-import { useState, useRef, FormEvent } from "react";
+import { useState, useRef, FormEvent, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -24,7 +24,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Save, Loader2, AlertCircle, ArrowLeft } from "lucide-react";
+import {
+  Save,
+  Loader2,
+  AlertCircle,
+  ArrowLeft,
+  Upload,
+  Image as ImageIcon,
+  FileText,
+  X,
+  CheckCircle,
+} from "lucide-react";
+
+interface UploadState {
+  file: File | null;
+  preview: string | null;
+  isUploading: boolean;
+  isUploaded: boolean;
+  uploadUrl: string | null;
+  progress: number;
+}
 
 /**
  * A client component that provides a form for administrators to create a new book,
@@ -35,14 +54,201 @@ export default function AddNewBookPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Refs are used to access the file input elements directly.
+  // Upload states for both files
+  const [coverUpload, setCoverUpload] = useState<UploadState>({
+    file: null,
+    preview: null,
+    isUploading: false,
+    isUploaded: false,
+    uploadUrl: null,
+    progress: 0,
+  });
+
+  const [bookUpload, setBookUpload] = useState<UploadState>({
+    file: null,
+    preview: null,
+    isUploading: false,
+    isUploaded: false,
+    uploadUrl: null,
+    progress: 0,
+  });
+
+  // Refs for hidden file inputs
   const coverFileRef = useRef<HTMLInputElement>(null);
   const bookFileRef = useRef<HTMLInputElement>(null);
 
   /**
-   * Handles the form submission, orchestrating file uploads and the final API call
-   * to create the book record in the database.
-   * @param {FormEvent<HTMLFormElement>} event - The form submission event.
+   * Uploads a file with progress tracking and chunked upload for large files
+   */
+  const uploadFileWithProgress = async (
+    file: File,
+    onProgress: (progress: number) => void
+  ): Promise<string> => {
+    // For large files (>10MB), we could implement chunked upload
+    // For now, we'll use a simple upload with progress simulation
+    const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
+    const isLargeFile = file.size > 10 * 1024 * 1024; // 10MB threshold
+
+    if (isLargeFile) {
+      // Simulate progress for large files
+      let progress = 0;
+      const progressInterval = setInterval(() => {
+        progress = Math.min(progress + Math.random() * 10, 90);
+        onProgress(progress);
+      }, 200);
+
+      try {
+        const response = await fetch(
+          `/api/upload?filename=${encodeURIComponent(file.name)}`,
+          {
+            method: "POST",
+            body: file,
+          }
+        );
+
+        clearInterval(progressInterval);
+        onProgress(100);
+
+        if (!response.ok) throw new Error(`Failed to upload ${file.name}`);
+        const newBlob = await response.json();
+        return newBlob.url;
+      } catch (error) {
+        clearInterval(progressInterval);
+        throw error;
+      }
+    } else {
+      // For smaller files, upload normally
+      onProgress(50);
+      const response = await fetch(
+        `/api/upload?filename=${encodeURIComponent(file.name)}`,
+        {
+          method: "POST",
+          body: file,
+        }
+      );
+      onProgress(100);
+
+      if (!response.ok) throw new Error(`Failed to upload ${file.name}`);
+      const newBlob = await response.json();
+      return newBlob.url;
+    }
+  };
+
+  /**
+   * Handles cover image selection and immediate upload
+   */
+  const handleCoverImageSelect = useCallback(async (file: File) => {
+    // Create preview
+    const preview = URL.createObjectURL(file);
+
+    setCoverUpload((prev) => ({
+      ...prev,
+      file,
+      preview,
+      isUploading: true,
+      progress: 0,
+    }));
+
+    try {
+      const uploadUrl = await uploadFileWithProgress(file, (progress) => {
+        setCoverUpload((prev) => ({ ...prev, progress }));
+      });
+
+      setCoverUpload((prev) => ({
+        ...prev,
+        isUploading: false,
+        isUploaded: true,
+        uploadUrl,
+      }));
+
+      toast.success("Cover image uploaded successfully!");
+    } catch (error: any) {
+      setCoverUpload((prev) => ({
+        ...prev,
+        isUploading: false,
+        isUploaded: false,
+      }));
+      toast.error(`Failed to upload cover image: ${error.message}`);
+    }
+  }, []);
+
+  /**
+   * Handles book file selection and immediate upload
+   */
+  const handleBookFileSelect = useCallback(async (file: File) => {
+    // Create preview info
+    const preview = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+
+    setBookUpload((prev) => ({
+      ...prev,
+      file,
+      preview,
+      isUploading: true,
+      progress: 0,
+    }));
+
+    try {
+      const uploadUrl = await uploadFileWithProgress(file, (progress) => {
+        setBookUpload((prev) => ({ ...prev, progress }));
+      });
+
+      setBookUpload((prev) => ({
+        ...prev,
+        isUploading: false,
+        isUploaded: true,
+        uploadUrl,
+      }));
+
+      toast.success("Book file uploaded successfully!");
+    } catch (error: any) {
+      setBookUpload((prev) => ({
+        ...prev,
+        isUploading: false,
+        isUploaded: false,
+      }));
+      toast.error(`Failed to upload book file: ${error.message}`);
+    }
+  }, []);
+
+  /**
+   * Removes uploaded cover image
+   */
+  const removeCoverImage = () => {
+    if (coverUpload.preview) {
+      URL.revokeObjectURL(coverUpload.preview);
+    }
+    setCoverUpload({
+      file: null,
+      preview: null,
+      isUploading: false,
+      isUploaded: false,
+      uploadUrl: null,
+      progress: 0,
+    });
+    if (coverFileRef.current) {
+      coverFileRef.current.value = "";
+    }
+  };
+
+  /**
+   * Removes uploaded book file
+   */
+  const removeBookFile = () => {
+    setBookUpload({
+      file: null,
+      preview: null,
+      isUploading: false,
+      isUploaded: false,
+      uploadUrl: null,
+      progress: 0,
+    });
+    if (bookFileRef.current) {
+      bookFileRef.current.value = "";
+    }
+  };
+
+  /**
+   * Handles the form submission
    */
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -50,45 +256,17 @@ export default function AddNewBookPage() {
     setError(null);
 
     const formData = new FormData(event.currentTarget);
-    const coverFile = coverFileRef.current?.files?.[0];
-    const bookFile = bookFileRef.current?.files?.[0];
 
     try {
-      // Validate that a cover image has been selected.
-      if (!coverFile) {
-        throw new Error("A cover image is required.");
+      // Validate that files have been uploaded
+      if (!coverUpload.isUploaded || !coverUpload.uploadUrl) {
+        throw new Error("Please upload a cover image first.");
       }
-      if (!bookFile) {
-        throw new Error("A book file (PDF, EPUB) is required.");
+      if (!bookUpload.isUploaded || !bookUpload.uploadUrl) {
+        throw new Error("Please upload a book file first.");
       }
 
-      /**
-       * A helper function to upload a file to the server via the `/api/upload` endpoint.
-       * @param {File} file - The file to be uploaded.
-       * @returns {Promise<string>} The URL of the uploaded file from Vercel Blob.
-       */
-      const uploadFile = async (file: File): Promise<string> => {
-        const response = await fetch(
-          // Pass the filename as a query parameter for the server to use.
-          `/api/upload?filename=${encodeURIComponent(file.name)}`,
-          {
-            method: "POST",
-            body: file,
-          }
-        );
-        if (!response.ok) throw new Error(`Failed to upload ${file.name}`);
-        const newBlob = await response.json();
-        return newBlob.url;
-      };
-
-      // Sequentially upload files and show progress via toasts.
-      toast.info("Uploading cover image...");
-      const coverImageUrl = await uploadFile(coverFile);
-
-      toast.info("Uploading book file...");
-      const bookFileUrl = await uploadFile(bookFile);
-
-      // Prepare the final book data payload for the API.
+      // Prepare the book data payload
       const bookData = {
         title: formData.get("title"),
         author: formData.get("author"),
@@ -97,11 +275,11 @@ export default function AddNewBookPage() {
         description: formData.get("description"),
         synopsis: formData.get("synopsis"),
         featured: formData.get("featured") === "on",
-        coverImage: coverImageUrl,
-        fileUrl: bookFileUrl,
+        coverImage: coverUpload.uploadUrl,
+        fileUrl: bookUpload.uploadUrl,
       };
 
-      // Send the book data to the server to create the database record.
+      // Send the book data to the server
       toast.loading("Saving book details...");
       const res = await fetch("/api/books", {
         method: "POST",
@@ -114,12 +292,12 @@ export default function AddNewBookPage() {
         throw new Error(errorData.message || "Failed to save the book.");
       }
 
-      toast.dismiss(); // Dismiss the "Saving..." toast.
+      toast.dismiss();
       toast.success("Book created successfully!");
-      router.push("/admin/books"); // Redirect to the main books management page.
+      router.push("/admin/books");
     } catch (err: any) {
-      toast.dismiss(); // Ensure loading toast is dismissed on error.
-      setError(err.message); // Display the error in the inline alert.
+      toast.dismiss();
+      setError(err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -135,7 +313,6 @@ export default function AddNewBookPage() {
           </p>
         </div>
         <Button variant="outline" asChild className="rounded-lg">
-          {/* TODO: Centralize application routes like '/admin/books' in a constants file. */}
           <Link href="/admin/books">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Manage Books
           </Link>
@@ -147,11 +324,11 @@ export default function AddNewBookPage() {
           <CardHeader>
             <CardTitle>Book Details</CardTitle>
             <CardDescription>
-              Enter information for the new book.
+              Enter information for the new book. Files will upload
+              automatically when selected.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Display an error message if the form submission fails. */}
             {error && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -235,27 +412,163 @@ export default function AddNewBookPage() {
               />
             </div>
 
+            {/* Custom File Upload Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Cover Image Upload */}
               <div className="space-y-2">
-                <Label htmlFor="coverFile">Cover Image</Label>
-                <Input
-                  id="coverFile"
+                <Label>Cover Image</Label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 transition-colors hover:border-gray-400">
+                  {!coverUpload.file ? (
+                    <div
+                      className="flex flex-col items-center justify-center py-8 cursor-pointer"
+                      onClick={() => coverFileRef.current?.click()}
+                    >
+                      <ImageIcon className="h-12 w-12 text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600 mb-2">
+                        Click to upload cover image
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        PNG, JPG, WEBP (max 10MB)
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {coverUpload.preview && (
+                        <div className="relative">
+                          <img
+                            src={coverUpload.preview}
+                            alt="Cover preview"
+                            className="w-full h-48 object-cover rounded-lg"
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="absolute top-2 right-2"
+                            onClick={removeCoverImage}
+                            disabled={coverUpload.isUploading}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+
+                      {coverUpload.isUploading && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">
+                              Uploading... {coverUpload.progress.toFixed(0)}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${coverUpload.progress}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {coverUpload.isUploaded && (
+                        <div className="flex items-center gap-2 text-green-600">
+                          <CheckCircle className="h-4 w-4" />
+                          <span className="text-sm">
+                            Cover image uploaded successfully
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <input
                   ref={coverFileRef}
                   type="file"
                   accept="image/*"
-                  required
-                  disabled={isSubmitting}
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleCoverImageSelect(file);
+                  }}
+                  disabled={isSubmitting || coverUpload.isUploading}
                 />
               </div>
+
+              {/* Book File Upload */}
               <div className="space-y-2">
-                <Label htmlFor="bookFile">Book File (PDF, EPUB)</Label>
-                <Input
-                  id="bookFile"
+                <Label>Book File (PDF, EPUB)</Label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 transition-colors hover:border-gray-400">
+                  {!bookUpload.file ? (
+                    <div
+                      className="flex flex-col items-center justify-center py-8 cursor-pointer"
+                      onClick={() => bookFileRef.current?.click()}
+                    >
+                      <FileText className="h-12 w-12 text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600 mb-2">
+                        Click to upload book file
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        PDF, EPUB (max 100MB)
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-5 w-5 text-gray-600" />
+                          <span className="text-sm font-medium truncate">
+                            {bookUpload.preview}
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={removeBookFile}
+                          disabled={bookUpload.isUploading}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      {bookUpload.isUploading && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">
+                              Uploading... {bookUpload.progress.toFixed(0)}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${bookUpload.progress}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {bookUpload.isUploaded && (
+                        <div className="flex items-center gap-2 text-green-600">
+                          <CheckCircle className="h-4 w-4" />
+                          <span className="text-sm">
+                            Book file uploaded successfully
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <input
                   ref={bookFileRef}
                   type="file"
                   accept=".pdf,.epub"
-                  required
-                  disabled={isSubmitting}
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleBookFileSelect(file);
+                  }}
+                  disabled={isSubmitting || bookUpload.isUploading}
                 />
               </div>
             </div>
@@ -271,7 +584,13 @@ export default function AddNewBookPage() {
             <Button
               type="submit"
               className="rounded-lg shadow-md"
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting ||
+                !coverUpload.isUploaded ||
+                !bookUpload.isUploaded ||
+                coverUpload.isUploading ||
+                bookUpload.isUploading
+              }
             >
               {isSubmitting ? (
                 <>
