@@ -35,17 +35,17 @@ TedBooks is a modern, full-stack e-commerce application designed for selling dig
   - A table of recent PayHero transactions.
 - **Book Management (CRUD):**
   - Add, view, edit, and delete books.
-  - **Direct File Uploads:** Upload book covers and digital book files (PDFs, EPUBs) directly to **Vercel Blob**.
+  - **Signed Direct Uploads:** Upload book covers and digital book files (PDFs, EPUBs) directly to **Cloudinary**, bypassing server payload limits.
 - **Order Management:** View all customer orders and update their status (e.g., from 'Pending' to 'Completed').
 - **Site Content Management:** Dynamically edit the content of static pages like "About Us" without needing to redeploy.
 
 ## Tech Stack
 
-- **Framework:** Next.js 15 (App Router)
+- **Framework:** Next.js (App Router)
 - **Styling:** Tailwind CSS with shadcn/ui
 - **Database:** MongoDB with Mongoose
 - **Authentication:** NextAuth.js (Auth.js v5) with Google Provider
-- **File Storage:** Vercel Blob
+- **File Storage:** **Cloudinary** (for robust, scalable file storage)
 - **Payments:** PayHero (Button SDK & Server-side API)
 - **State Management:** React Context API (`useContext`) for cart state
 - **UI/UX:** Framer Motion for animations, `sonner` for toast notifications
@@ -58,7 +58,7 @@ Before you begin, ensure you have the following set up:
 - `npm`, `yarn`, or `pnpm`
 - A MongoDB database instance (e.g., a free cluster on [MongoDB Atlas](https://www.mongodb.com/cloud/atlas))
 - A Google Cloud project with OAuth 2.0 credentials enabled.
-- A [Vercel](https://vercel.com) account to set up a Blob store.
+- A **[Cloudinary](https://cloudinary.com/)** account with API credentials.
 - A [PayHero](https://payhero.co.ke/) account with API credentials and a Lipwa link.
 
 ## Getting Started
@@ -73,6 +73,8 @@ cd tedbooks
 ```
 
 ### 2. Install Dependencies
+
+You will need the `cloudinary` package for this setup.
 
 ```bash
 npm install
@@ -96,14 +98,16 @@ AUTH_SECRET='your_auth_secret_here'
 AUTH_GOOGLE_ID='your_google_client_id'
 AUTH_GOOGLE_SECRET='your_google_client_secret'
 
-# Base URL
-NEXT_PUBLIC_BASE_URL='https://example.com'
+# Base URL (for server-side API calls)
+NEXT_PUBLIC_BASE_URL='http://localhost:3000'
 
 # MongoDB Connection String
 MONGODB_URI='your_mongodb_connection_string'
 
-# Vercel Blob Storage Token
-BLOB_READ_WRITE_TOKEN='your_vercel_blob_read_write_token'
+# Cloudinary Credentials (for signed uploads)
+CLOUDINARY_CLOUD_NAME='your_cloudinary_cloud_name'
+CLOUDINARY_API_KEY='your_cloudinary_api_key'
+CLOUDINARY_API_SECRET='your_cloudinary_api_secret'
 
 # PayHero API Credentials (for server-side calls)
 PAYHERO_API_USERNAME='your_payhero_api_username'
@@ -115,7 +119,7 @@ NEXT_PUBLIC_PAYHERO_LIPWA_URL='your_payhero_lipwa_url'
 NEXT_PUBLIC_PAYHERO_CHANNEL_ID='your_payhero_sdk_channel_id'
 ```
 
-> **Note:** To get the `AUTH_SECRET`, run `npx auth secret` in your terminal.
+> **Note:** To get the `AUTH_SECRET`, run `npx auth secret` in your terminal. For production, `NEXT_PUBLIC_BASE_URL` should be your public domain (e.g., `https://www.tedbooks.com`).
 
 ### 4. Run the Development Server
 
@@ -136,11 +140,9 @@ Your application should now be running at [http://localhost:3000](http://localho
 ```
 .
 ├── app/
-│   ├── ├── about/
-│   │   ├── account/
-│   │   ├── book/[id]/
-│   │   └── ...
-│   │
+│   ├── about/
+│   ├── account/
+│   ├── book/[id]/
 │   ├── admin/                    # Protected admin panel pages
 │   │   ├── books/
 │   │   ├── content/
@@ -150,20 +152,24 @@ Your application should now be running at [http://localhost:3000](http://localho
 │   │   ├── books/
 │   │   ├── cart/
 │   │   ├── orders/
-│   │   ├── upload/
+│   │   ├── upload/               # Generates Cloudinary signatures
 │   │   └── webhooks/
 │   └── layout.tsx                # Root layout
 ├── components/
+│   ├── admin/
+│   │   ├── add-book-form.tsx
+│   │   ├── edit-book-form.tsx
+│   │   └── file-upload.tsx       # Reusable Cloudinary upload component
 │   ├── books/
 │   ├── cart/
 │   ├── layout/
-│   ├── shared/
 │   └── ui/                       # shadcn/ui components
 ├── context/
 │   └── CartContext.tsx           # Hybrid cart state management
 ├── lib/
 │   ├── data.ts                   # Centralized data fetching functions
-│   └── db.ts                     # Database connection utility
+│   ├── db.ts                     # Database connection utility
+│   └── upload-utils.ts           # Client-side Cloudinary upload logic
 ├── models/
 │   ├── Book.ts
 │   ├── Cart.ts
