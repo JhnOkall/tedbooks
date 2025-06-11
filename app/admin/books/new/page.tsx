@@ -1,6 +1,7 @@
 /**
  * @file This file defines the admin page for adding a new book to the catalog.
  * It provides a comprehensive form for all book details, including file uploads with previews.
+ * This component is designed to work with a specific API endpoint for file uploads.
  */
 
 "use client";
@@ -29,8 +30,7 @@ import {
   Loader2,
   AlertCircle,
   ArrowLeft,
-  Upload,
-  Image as ImageIcon,
+  ImageIcon,
   FileText,
   X,
   CheckCircle,
@@ -78,79 +78,72 @@ export default function AddNewBookPage() {
   const bookFileRef = useRef<HTMLInputElement>(null);
 
   /**
-   * Uploads a file with progress tracking and chunked upload for large files
+   * Uploads a file to the API endpoint with progress simulation.
+   * @param file The file to upload.
+   * @param uploadType The type of upload ('cover' or 'book'), used for API routing and validation.
+   * @param onProgress A callback to report upload progress.
+   * @returns The final URL of the uploaded file.
    */
-  const uploadFileWithProgress = async (
+  const uploadFile = async (
     file: File,
+    uploadType: "cover" | "book",
     onProgress: (progress: number) => void
   ): Promise<string> => {
-    // For large files (>10MB), we could implement chunked upload
-    // For now, we'll use a simple upload with progress simulation
-    const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
-    const isLargeFile = file.size > 10 * 1024 * 1024; // 10MB threshold
+    // Simulate progress for better UX, as fetch() doesn't natively support upload progress.
+    let progress = 0;
+    onProgress(progress);
+    const progressInterval = setInterval(() => {
+      progress = Math.min(progress + Math.random() * 10, 90); // Cap at 90% until complete
+      onProgress(progress);
+    }, 300);
 
-    if (isLargeFile) {
-      // Simulate progress for large files
-      let progress = 0;
-      const progressInterval = setInterval(() => {
-        progress = Math.min(progress + Math.random() * 10, 90);
-        onProgress(progress);
-      }, 200);
+    try {
+      const url = `/api/upload?uploadType=${uploadType}&originalFilename=${encodeURIComponent(
+        file.name
+      )}`;
 
-      try {
-        const response = await fetch(
-          `/api/upload?filename=${encodeURIComponent(file.name)}`,
-          {
-            method: "POST",
-            body: file,
-          }
-        );
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": file.type, // The API validates this header
+        },
+        body: file,
+      });
 
-        clearInterval(progressInterval);
-        onProgress(100);
+      clearInterval(progressInterval);
+      onProgress(100); // Finalize progress
 
-        if (!response.ok) throw new Error(`Failed to upload ${file.name}`);
-        const newBlob = await response.json();
-        return newBlob.url;
-      } catch (error) {
-        clearInterval(progressInterval);
-        throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Failed to upload ${file.name}`);
       }
-    } else {
-      // For smaller files, upload normally
-      onProgress(50);
-      const response = await fetch(
-        `/api/upload?filename=${encodeURIComponent(file.name)}`,
-        {
-          method: "POST",
-          body: file,
-        }
-      );
-      onProgress(100);
 
-      if (!response.ok) throw new Error(`Failed to upload ${file.name}`);
       const newBlob = await response.json();
       return newBlob.url;
+    } catch (error) {
+      clearInterval(progressInterval);
+      onProgress(0); // Reset progress on error
+      throw error;
     }
   };
 
   /**
-   * Handles cover image selection and immediate upload
+   * Handles cover image selection and triggers the upload process.
    */
   const handleCoverImageSelect = useCallback(async (file: File) => {
-    // Create preview
     const preview = URL.createObjectURL(file);
 
-    setCoverUpload((prev) => ({
-      ...prev,
+    setCoverUpload({
       file,
       preview,
       isUploading: true,
+      isUploaded: false,
+      uploadUrl: null,
       progress: 0,
-    }));
+    });
 
     try {
-      const uploadUrl = await uploadFileWithProgress(file, (progress) => {
+      const uploadUrl = await uploadFile(file, "cover", (progress) => {
         setCoverUpload((prev) => ({ ...prev, progress }));
       });
 
@@ -168,27 +161,27 @@ export default function AddNewBookPage() {
         isUploading: false,
         isUploaded: false,
       }));
-      toast.error(`Failed to upload cover image: ${error.message}`);
+      toast.error(`Cover upload failed: ${error.message}`);
     }
   }, []);
 
   /**
-   * Handles book file selection and immediate upload
+   * Handles book file selection and triggers the upload process.
    */
   const handleBookFileSelect = useCallback(async (file: File) => {
-    // Create preview info
     const preview = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
 
-    setBookUpload((prev) => ({
-      ...prev,
+    setBookUpload({
       file,
       preview,
       isUploading: true,
+      isUploaded: false,
+      uploadUrl: null,
       progress: 0,
-    }));
+    });
 
     try {
-      const uploadUrl = await uploadFileWithProgress(file, (progress) => {
+      const uploadUrl = await uploadFile(file, "book", (progress) => {
         setBookUpload((prev) => ({ ...prev, progress }));
       });
 
@@ -206,12 +199,12 @@ export default function AddNewBookPage() {
         isUploading: false,
         isUploaded: false,
       }));
-      toast.error(`Failed to upload book file: ${error.message}`);
+      toast.error(`Book file upload failed: ${error.message}`);
     }
   }, []);
 
   /**
-   * Removes uploaded cover image
+   * Resets the cover image upload state.
    */
   const removeCoverImage = () => {
     if (coverUpload.preview) {
@@ -231,7 +224,7 @@ export default function AddNewBookPage() {
   };
 
   /**
-   * Removes uploaded book file
+   * Resets the book file upload state.
    */
   const removeBookFile = () => {
     setBookUpload({
@@ -248,7 +241,7 @@ export default function AddNewBookPage() {
   };
 
   /**
-   * Handles the form submission
+   * Handles the final form submission to create the book entry in the database.
    */
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -258,7 +251,7 @@ export default function AddNewBookPage() {
     const formData = new FormData(event.currentTarget);
 
     try {
-      // Validate that files have been uploaded
+      // Validate that files have been successfully uploaded first.
       if (!coverUpload.isUploaded || !coverUpload.uploadUrl) {
         throw new Error("Please upload a cover image first.");
       }
@@ -266,7 +259,7 @@ export default function AddNewBookPage() {
         throw new Error("Please upload a book file first.");
       }
 
-      // Prepare the book data payload
+      // Prepare the book data payload with the URLs from the upload process.
       const bookData = {
         title: formData.get("title"),
         author: formData.get("author"),
@@ -279,7 +272,7 @@ export default function AddNewBookPage() {
         fileUrl: bookUpload.uploadUrl,
       };
 
-      // Send the book data to the server
+      // Send the book metadata to the server to be saved.
       toast.loading("Saving book details...");
       const res = await fetch("/api/books", {
         method: "POST",
@@ -298,6 +291,7 @@ export default function AddNewBookPage() {
     } catch (err: any) {
       toast.dismiss();
       setError(err.message);
+      toast.error(err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -484,7 +478,7 @@ export default function AddNewBookPage() {
                 <input
                   ref={coverFileRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/png, image/jpeg, image/webp"
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
@@ -508,7 +502,7 @@ export default function AddNewBookPage() {
                         Click to upload book file
                       </p>
                       <p className="text-xs text-gray-400">
-                        PDF, EPUB (max 100MB)
+                        PDF, EPUB (max 50MB)
                       </p>
                     </div>
                   ) : (
@@ -587,9 +581,7 @@ export default function AddNewBookPage() {
               disabled={
                 isSubmitting ||
                 !coverUpload.isUploaded ||
-                !bookUpload.isUploaded ||
-                coverUpload.isUploading ||
-                bookUpload.isUploading
+                !bookUpload.isUploaded
               }
             >
               {isSubmitting ? (
