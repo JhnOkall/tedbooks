@@ -81,10 +81,11 @@ export const uploadFileWithProgress = async (
   formData.append('signature', signature);
   formData.append('folder', folder);
   formData.append('public_id', public_id);
+  formData.append('resource_type', resource_type); 
   // For raw files, we want to preserve the original filename for download
   if (resource_type === 'raw') {
     formData.append('filename_override', file.name);
-    formData.append('use_filename', 'true');
+    formData.append('use_filename', 'true'); 
   }
 
 
