@@ -1,31 +1,31 @@
 /**
- * @file This file contains utility functions for file uploads to Cloudinary using a signed upload flow.
+ * @file This file contains utility functions for file uploads to Cloudinary using a signed, chunked upload flow.
  */
 import { customAlphabet } from 'nanoid';
 
 const nanoid = customAlphabet(
-  '0123456789abcdefghijklmnopqrstuvwxyz', // Using lowercase only for cleaner URLs
+  '0123456789abcdefghijklmnopqrstuvwxyz',
   16
 );
 
 function slugify(text: string): string {
+  // ... your existing slugify function remains the same ...
   const a = 'àáâäæãåāăąçćčđďèéêëēėęěğǵḧîïíīįìłḿñńǹňôöòóœøōõőṕŕřßśšşșťțûüùúūǘůűųẃẍÿýžźż·/_,:;'
   const b = 'aaaaaaaaaacccddeeeeeeeegghiiiiiilmnnnnoooooooooprrsssssttuuuuuuuuuwxyyzzz------'
   const p = new RegExp(a.split('').join('|'), 'g')
 
   return text.toString().toLowerCase()
-    .replace(/\s+/g, '-') // Replace spaces with -
-    .replace(p, c => b.charAt(a.indexOf(c))) // Replace special characters
-    .replace(/&/g, '-and-') // Replace & with 'and'
-    .replace(/[^\w\-]+/g, '') // Remove all non-word chars
-    .replace(/\-\-+/g, '-') // Replace multiple - with single -
-    .replace(/^-+/, '') // Trim - from start of text
-    .replace(/-+$/, '') // Trim - from end of text
+    .replace(/\s+/g, '-')
+    .replace(p, c => b.charAt(a.indexOf(c)))
+    .replace(/&/g, '-and-')
+    .replace(/[^\w\-]+/g, '')
+    .replace(/\-\-+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '')
 }
 
-
 /**
- * Uploads a file directly to Cloudinary using a server-generated signature.
+ * Uploads a file directly to Cloudinary using a signed, chunked upload flow.
  *
  * @param file The file to upload.
  * @param uploadType The type of upload ('image' or 'file') to determine Cloudinary settings.
@@ -40,16 +40,12 @@ export const uploadFileWithProgress = async (
   onProgress(0);
 
   // === Step 1: Prepare upload parameters and get a signature from our API ===
-  const fileExtension = file.name.split('.').pop() || '';
+  // This part is the same as before.
   const originalFilenameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
   
   const folder = uploadType === 'image' ? 'book-covers' : 'book-files';
-  const resource_type = uploadType === 'image' ? 'image' : 'raw'; // 'raw' is for non-image files like PDF/EPUB
-
-  // Create a unique public_id. For books, we use a slug; for images, a random ID.
-  const public_id = uploadType === 'image' 
-    ? nanoid() 
-    : slugify(originalFilenameWithoutExt);
+  const resource_type = uploadType === 'image' ? 'image' : 'raw';
+  const public_id = uploadType === 'image' ? nanoid() : slugify(originalFilenameWithoutExt);
     
   let signatureResponse;
   try {
@@ -59,7 +55,6 @@ export const uploadFileWithProgress = async (
       body: JSON.stringify({ folder, public_id, resource_type }),
     });
     signatureResponse = await res.json();
-
     if (!res.ok || !signatureResponse.success) {
       throw new Error(signatureResponse.message || 'Failed to get upload signature.');
     }
@@ -68,56 +63,81 @@ export const uploadFileWithProgress = async (
     throw new Error('Could not prepare the file for upload. Please try again.');
   }
   
-  onProgress(10); // Indicate that signing is complete
+  onProgress(5); // Signing is a small step now
 
-  // === Step 2: Upload the file directly to Cloudinary using the signature ===
-  const { signature, timestamp, api_key, cloud_name, resource_type: returnedResourceType, signed_params } = signatureResponse;
+  // === Step 2: Set up constants and variables for chunked upload ===
+  const { signature, timestamp, api_key, cloud_name, resource_type: returnedResourceType } = signatureResponse;
   const url = `https://api.cloudinary.com/v1_1/${cloud_name}/${returnedResourceType}/upload`;
 
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('api_key', api_key);
-  formData.append('timestamp', timestamp);
-  formData.append('signature', signature);
-  formData.append('folder', folder);
-  formData.append('public_id', public_id);
-  
-  // Only append parameters that were included in the signature
-  if (signed_params?.use_filename) {
-    formData.append('use_filename', 'true');
-  }
+  // Use a chunk size of 6MB. Cloudinary's limit for raw files on the free plan is 10MB.
+  // Using 6MB gives us a safe buffer.
+  const CHUNK_SIZE = 6 * 1024 * 1024;
+  const totalSize = file.size;
+  const uniqueUploadId = nanoid(); // A unique ID for this specific file upload
+  let start = 0;
 
+  // === Step 3: Sequentially upload chunks ===
   return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', url, true);
-
-    // Monitor upload progress
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        const progress = Math.round((event.loaded / event.total) * 100);
-        // We scale progress from 10% to 100% to account for the signing step
-        onProgress(10 + (progress * 0.9));
+    
+    const uploadChunk = (startByte: number) => {
+      const endByte = Math.min(startByte + CHUNK_SIZE, totalSize);
+      const chunk = file.slice(startByte, endByte);
+      
+      const formData = new FormData();
+      formData.append('file', chunk);
+      formData.append('api_key', api_key);
+      formData.append('timestamp', timestamp);
+      formData.append('signature', signature);
+      formData.append('folder', folder);
+      formData.append('public_id', public_id);
+      
+      // `use_filename` is only for 'raw' types and must be signed.
+      if (resource_type === 'raw') {
+        formData.append('use_filename', 'true');
       }
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+
+      // Set headers required for chunked uploads
+      xhr.setRequestHeader('X-Unique-Upload-Id', uniqueUploadId);
+      xhr.setRequestHeader('Content-Range', `bytes ${startByte}-${endByte - 1}/${totalSize}`);
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          // Calculate progress based on chunks uploaded so far + progress of the current chunk
+          const progress = Math.round(((startByte + event.loaded) / totalSize) * 100);
+          onProgress(progress);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          const response = JSON.parse(xhr.responseText);
+
+          // If there are more chunks to upload, start the next one
+          if (endByte < totalSize) {
+            uploadChunk(endByte);
+          } else {
+            // This was the last chunk, the upload is complete
+            onProgress(100);
+            resolve(response.secure_url);
+          }
+        } else {
+          const errorResponse = JSON.parse(xhr.responseText);
+          console.error("Cloudinary chunk upload error:", errorResponse);
+          reject(new Error(errorResponse.error?.message || 'A part of the file failed to upload.'));
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new Error('An network error occurred during the upload. Please check your connection.'));
+      };
+
+      xhr.send(formData);
     };
 
-    // Handle completion
-    xhr.onload = () => {
-      if (xhr.status === 200) {
-        onProgress(100);
-        const response = JSON.parse(xhr.responseText);
-        resolve(response.secure_url);
-      } else {
-        const errorResponse = JSON.parse(xhr.responseText);
-        console.error("Cloudinary upload error:", errorResponse);
-        reject(new Error(errorResponse.error?.message || 'Upload failed.'));
-      }
-    };
-
-    // Handle errors
-    xhr.onerror = () => {
-      reject(new Error('An network error occurred during the upload.'));
-    };
-
-    xhr.send(formData);
+    // Start the upload process with the first chunk
+    uploadChunk(0);
   });
 };
