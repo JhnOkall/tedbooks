@@ -43,13 +43,13 @@ export function BookCard({ book }: BookCardProps): JSX.Element {
       whileHover={{ y: -5, scale: 1.03 }}
       transition={{ type: "spring", stiffness: 300 }}
     >
-      {/* Removed CardHeader entirely and moved image directly into Card */}
-      <Card className="flex flex-col overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 group">
+      {/* Added p-0 to remove default padding from Card */}
+      <Card className="flex flex-col overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 group p-0">
         {/* The book cover image, linked to the book's detail page.
-            Now directly inside Card with no CardHeader wrapper */}
+            Now directly inside Card with no spacing */}
         <Link
           href={`/book/${book._id}`}
-          className="block aspect-[2/3] relative overflow-hidden rounded-t-lg"
+          className="block aspect-[2/3] relative overflow-hidden"
           aria-label={`View details for ${book.title}`}
         >
           <Image
