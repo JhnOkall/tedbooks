@@ -1,7 +1,8 @@
 /**
  * @file This file defines the main Admin Dashboard page and its sub-components.
  * It is a client component that fetches and displays key metrics from both the
- * internal database and the external PayHero payment service.
+ * internal database and the external PayHero payment service, and allows for
+ * management of automated payouts.
  */
 
 "use client";
@@ -23,6 +24,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +42,7 @@ import {
   Loader2,
   Landmark,
   Fuel,
+  Trash2,
 } from "lucide-react";
 
 /**
@@ -54,17 +63,21 @@ type Transaction = {
   created_at: string;
 };
 type TransactionData = { transactions: Transaction[]; pagination: any };
+type PayoutConfig = {
+  _id: string;
+  name: string;
+  phone: string;
+  payoutPercentage: number;
+  payoutFrequency: "weekly" | "monthly";
+};
 
 /**
  * A helper function to format a number as Kenyan Shillings.
- * @param {number} amount - The numeric amount to format.
- * @returns {string} The formatted currency string.
  */
 const formatCurrency = (amount: number): string => `Ksh. ${amount.toFixed(2)}`;
 
 /**
- * The main component for the Admin Dashboard page. It orchestrates data fetching
- * and renders the various informational sections.
+ * The main component for the Admin Dashboard page.
  */
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -74,23 +87,20 @@ export default function AdminDashboardPage() {
   );
   const [isLoading, setIsLoading] = useState(true);
 
-  /**
-   * Fetches all required dashboard data in parallel from the relevant API endpoints.
-   */
   const fetchDashboardData = async () => {
-    setIsLoading(true);
+    // No need to set loading to true on manual refresh if data already exists
+    if (!stats) setIsLoading(true);
+
     try {
-      // TODO: Centralize API route paths into a shared constants file for better maintainability.
       const [statsRes, walletsRes, transactionsRes] = await Promise.all([
         fetch("/api/admin/stats"),
         fetch("/api/admin/payhero/balance"),
-        fetch("/api/admin/payhero/transactions?per=5"), // Fetch the 5 most recent transactions.
+        fetch("/api/admin/payhero/transactions?per=5"),
       ]);
 
       if (statsRes.ok) setStats(await statsRes.json());
       if (walletsRes.ok) setWallets(await walletsRes.json());
       if (transactionsRes.ok) setTransactions(await transactionsRes.json());
-      // TODO: Add specific error handling for non-ok responses to provide more granular feedback.
     } catch (error) {
       toast.error("Failed to load some dashboard data.");
       console.error(error);
@@ -99,12 +109,10 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Fetch data when the component mounts.
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
-  // Displays a loading spinner while initial data is being fetched.
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -152,6 +160,9 @@ export default function AdminDashboardPage() {
         <TopUpCard onSuccessfulTopUp={fetchDashboardData} />
       </div>
 
+      {/* Payout Management Section */}
+      <PayoutManagementCard />
+
       {/* Recent Transactions from PayHero */}
       <RecentTransactionsTable data={transactions} />
     </div>
@@ -160,9 +171,6 @@ export default function AdminDashboardPage() {
 
 // --- Sub-Components ---
 
-/**
- * A reusable card component for displaying a single statistic.
- */
 function StatCard({
   icon,
   title,
@@ -185,9 +193,6 @@ function StatCard({
   );
 }
 
-/**
- * A card component for displaying PayHero wallet balances.
- */
 function PayHeroWalletsCard({ wallets }: { wallets: Wallets | null }) {
   return (
     <Card className="md:col-span-1 rounded-lg shadow-md">
@@ -231,16 +236,9 @@ function PayHeroWalletsCard({ wallets }: { wallets: Wallets | null }) {
   );
 }
 
-/**
- * A card component with a form to initiate an M-Pesa STK push for topping up the service wallet.
- */
 function TopUpCard({ onSuccessfulTopUp }: { onSuccessfulTopUp: () => void }) {
   const [isToppingUp, setIsToppingUp] = useState(false);
 
-  /**
-   * Handles the form submission to initiate the top-up process.
-   * @param {FormEvent<HTMLFormElement>} event - The form submission event.
-   */
   const handleTopUp = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsToppingUp(true);
@@ -249,9 +247,7 @@ function TopUpCard({ onSuccessfulTopUp }: { onSuccessfulTopUp: () => void }) {
       amount: Number(formData.get("amount")),
       phone_number: formData.get("phone_number") as string,
     };
-
-    toast.info("Sending STK push to your phone...");
-
+    toast.info("Sending STK push...");
     try {
       const res = await fetch("/api/admin/payhero/topup", {
         method: "POST",
@@ -260,13 +256,10 @@ function TopUpCard({ onSuccessfulTopUp }: { onSuccessfulTopUp: () => void }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Top-up request failed.");
-
       toast.success("STK push sent!", {
-        description: "Please enter your PIN to complete the transaction.",
+        description: "Enter your PIN to complete.",
       });
-      // TODO: Implement a more robust mechanism like WebSockets or server-sent events
-      // to update the balance in real-time upon successful payment, instead of a timeout.
-      setTimeout(onSuccessfulTopUp, 30000); // Refresh balance after 30 seconds.
+      setTimeout(onSuccessfulTopUp, 30000);
     } catch (error: any) {
       toast.error("Top-up Failed", { description: error.message });
     } finally {
@@ -279,9 +272,7 @@ function TopUpCard({ onSuccessfulTopUp }: { onSuccessfulTopUp: () => void }) {
     <Card className="md:col-span-2 rounded-lg shadow-md">
       <CardHeader>
         <CardTitle>Top Up Service Wallet</CardTitle>
-        <CardDescription>
-          Add funds to your service wallet via M-Pesa STK push.
-        </CardDescription>
+        <CardDescription>Add funds via M-Pesa STK push.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleTopUp} className="space-y-4">
@@ -317,9 +308,169 @@ function TopUpCard({ onSuccessfulTopUp }: { onSuccessfulTopUp: () => void }) {
   );
 }
 
-/**
- * A component that displays recent PayHero transactions in a table.
- */
+function PayoutManagementCard() {
+  const [configs, setConfigs] = useState<PayoutConfig[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchConfigs = async () => {
+    setIsLoading(true);
+    const res = await fetch("/api/admin/payouts");
+    if (res.ok) setConfigs(await res.json());
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    fetchConfigs();
+  }, []);
+
+  const handleAddConfig = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSubmitting(true);
+    const formData = new FormData(event.currentTarget);
+    const payload = {
+      name: formData.get("name"),
+      phone: formData.get("phone"),
+      payoutPercentage: Number(formData.get("percentage")),
+      payoutFrequency: formData.get("frequency"),
+    };
+    try {
+      const res = await fetch("/api/admin/payouts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      toast.success("Payout configuration added!");
+      await fetchConfigs();
+      (event.target as HTMLFormElement).reset();
+    } catch (error: any) {
+      toast.error("Failed to add", { description: error.message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteConfig = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this configuration?")) return;
+    toast.promise(fetch(`/api/admin/payouts/${id}`, { method: "DELETE" }), {
+      loading: "Deleting...",
+      success: () => {
+        fetchConfigs(); // Refresh list on success
+        return "Configuration deleted.";
+      },
+      error: "Deletion failed.",
+    });
+  };
+
+  const totalPercentage = configs.reduce(
+    (sum, c) => sum + c.payoutPercentage,
+    0
+  );
+
+  return (
+    <Card className="rounded-lg shadow-md col-span-full">
+      <CardHeader>
+        <CardTitle>Payout Management</CardTitle>
+        <CardDescription>
+          Configure automated payouts from the payments wallet.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid md:grid-cols-3 gap-6">
+        <form onSubmit={handleAddConfig} className="md:col-span-1 space-y-4">
+          <h3 className="font-semibold">Add New Employee</h3>
+          <Input
+            name="name"
+            placeholder="Employee Name"
+            required
+            disabled={isSubmitting}
+          />
+          <Input
+            name="phone"
+            placeholder="Phone (e.g., 07...)"
+            required
+            disabled={isSubmitting}
+          />
+          <Input
+            name="percentage"
+            type="number"
+            step="0.1"
+            min="0"
+            max="100"
+            placeholder="Payout %"
+            required
+            disabled={isSubmitting}
+          />
+          <Select name="frequency" required>
+            <SelectTrigger disabled={isSubmitting}>
+              <SelectValue placeholder="Select Frequency" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="weekly">Weekly</SelectItem>
+              <SelectItem value="monthly">Monthly</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button type="submit" disabled={isSubmitting} className="w-full">
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{" "}
+            Add Configuration
+          </Button>
+        </form>
+        <div className="md:col-span-2">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="font-semibold">Current Configurations</h3>
+            <p className="text-sm font-bold text-primary">
+              Total Allocated: {totalPercentage.toFixed(1)}%
+            </p>
+          </div>
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Frequency</TableHead>
+                  <TableHead className="text-right">%</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center">
+                      <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  configs.map((c) => (
+                    <TableRow key={c._id}>
+                      <TableCell>{c.name}</TableCell>
+                      <TableCell className="capitalize">
+                        {c.payoutFrequency}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {c.payoutPercentage}%
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteConfig(c._id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function RecentTransactionsTable({ data }: { data: TransactionData | null }) {
   return (
     <Card className="rounded-lg shadow-md">
@@ -334,10 +485,8 @@ function RecentTransactionsTable({ data }: { data: TransactionData | null }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="hidden sm:table-cell">Type</TableHead>
-                <TableHead className="hidden sm:table-cell">
-                  Description
-                </TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Description</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
               </TableRow>
@@ -346,12 +495,10 @@ function RecentTransactionsTable({ data }: { data: TransactionData | null }) {
               {data?.transactions.length ? (
                 data.transactions.map((tx) => (
                   <TableRow key={tx.id}>
-                    <TableCell className="hidden sm:table-cell font-medium capitalize">
+                    <TableCell className="font-medium capitalize">
                       {tx.transaction_type.replace(/_/g, " ")}
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      {tx.description}
-                    </TableCell>
+                    <TableCell>{tx.description}</TableCell>
                     <TableCell>
                       {new Date(tx.created_at).toLocaleDateString()}
                     </TableCell>

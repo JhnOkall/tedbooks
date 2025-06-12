@@ -1,8 +1,8 @@
 # TedBooks - A Full-Stack E-commerce Bookstore
 
-TedBooks is a modern, full-stack e-commerce application designed for selling digital books. Built with the Next.js App Router, it features a complete user authentication system, a powerful admin dashboard for managing content **(now supercharged with AI to automatically generate book descriptions and synopses)**, and a seamless payment integration with PayHero.
+TedBooks is a modern, full-stack e-commerce application designed for selling digital books. Built with the Next.js App Router, it features a complete user authentication system, a powerful admin dashboard for managing content **(now supercharged with AI to automatically generate book descriptions and synopses)**, a seamless payment integration with PayHero, and an **automated employee payout system**.
 
-![TedBooks Screenshot (Conceptual)](https://75rfypg2otkow6jl.public.blob.vercel-storage.com/Screenshot%202025-06-07%20154800-QlM51gxoVZrvCvPg3fcI3wgB1pkegA.png)
+![TedBooks Screenshot](https://res.cloudinary.com/dli0mqabp/image/upload/v1749713633/Screenshot_2025-06-12_103233_otu2ys.png)
 
 ## Features
 
@@ -39,6 +39,11 @@ TedBooks is a modern, full-stack e-commerce application designed for selling dig
 - **AI-Powered Content Generation:** With the click of a button, admins can use **Google's Gemini API** to automatically generate compelling book descriptions and synopses directly from the book's title and author, saving significant time on content creation.
 - **Order Management:** View all customer orders and update their status (e.g., from 'Pending' to 'Completed').
 - **Site Content Management:** Dynamically edit the content of static pages like "About Us" without needing to redeploy.
+- **Automated Payout System:**
+  - Configure employee/contractor payouts (name, phone, percentage).
+  - Set payout frequency to weekly or monthly.
+  - **Vercel Cron Jobs** automatically trigger a secure API endpoint daily to process scheduled payouts.
+  - The system calculates payouts based on a percentage of the current Payments Wallet balance and dispatches funds via the PayHero B2C API.
 
 ## Tech Stack
 
@@ -49,6 +54,7 @@ TedBooks is a modern, full-stack e-commerce application designed for selling dig
 - **AI Content Generation:** **Google Gemini API**
 - **File Storage:** **Cloudinary** (for robust, scalable file storage)
 - **Payments:** PayHero (Button SDK & Server-side API)
+- **Scheduled Jobs:** **Vercel Cron Jobs**
 - **State Management:** React Context API (`useContext`) for cart state
 - **UI/UX:** Framer Motion for animations, `sonner` for toast notifications
 
@@ -63,6 +69,7 @@ Before you begin, ensure you have the following set up:
 - A **[Google AI Studio](https://aistudio.google.com/)** account to get a Gemini API key.
 - A **[Cloudinary](https://cloudinary.com/)** account with API credentials.
 - A [PayHero](https://payhero.co.ke/) account with API credentials and a Lipwa link.
+- A Vercel account (for deploying with Cron Jobs).
 
 ## Getting Started
 
@@ -77,14 +84,8 @@ cd tedbooks
 
 ### 2. Install Dependencies
 
-You will need the `@google/generative-ai` and `cloudinary` packages for this setup.
-
 ```bash
 npm install
-# or
-yarn install
-# or
-pnpm install
 ```
 
 ### 3. Set Up Environment Variables
@@ -94,40 +95,55 @@ Create a `.env.local` file in the root of your project by copying the example be
 ```env
 # .env.local
 
-# Authentication (generate with `npx auth secret`)
+# --- CORE ---
 AUTH_SECRET='your_auth_secret_here'
+NEXT_PUBLIC_BASE_URL='http://localhost:3000'
 
-# Google OAuth Credentials
+# --- DATABASE ---
+MONGODB_URI='your_mongodb_connection_string'
+
+# --- AUTHENTICATION ---
 AUTH_GOOGLE_ID='your_google_client_id'
 AUTH_GOOGLE_SECRET='your_google_client_secret'
 
-# Base URL (for server-side API calls)
-NEXT_PUBLIC_BASE_URL='http://localhost:3000'
-
-# MongoDB Connection String
-MONGODB_URI='your_mongodb_connection_string'
-
-# Google Gemini API Key (for AI content generation)
+# --- AI & FILE STORAGE ---
 GEMINI_API_KEY='your_gemini_api_key_here'
-
-# Cloudinary Credentials (for signed uploads)
 CLOUDINARY_CLOUD_NAME='your_cloudinary_cloud_name'
 CLOUDINARY_API_KEY='your_cloudinary_api_key'
 CLOUDINARY_API_SECRET='your_cloudinary_api_secret'
 
-# PayHero API Credentials (for server-side calls)
+# --- PAYMENTS (PAYHERO) ---
 PAYHERO_API_USERNAME='your_payhero_api_username'
 PAYHERO_API_PASSWORD='your_payhero_api_password'
 PAYHERO_WALLET_CHANNEL_ID='your_payhero_wallet_channel_id'
-
-# PayHero SDK Configuration (for client-side button)
 NEXT_PUBLIC_PAYHERO_LIPWA_URL='your_payhero_lipwa_url'
 NEXT_PUBLIC_PAYHERO_CHANNEL_ID='your_payhero_sdk_channel_id'
+
+# --- CRON JOBS ---
+CRON_SECRET='generate_a_strong_random_secret_string'
 ```
 
-> **Note:** To get the `AUTH_SECRET`, run `npx auth secret` in your terminal. For production, `NEXT_PUBLIC_BASE_URL` should be your public domain (e.g., `https://www.tedbooks.com`).
+> **Note:** To get the `AUTH_SECRET`, run `npx auth secret` in your terminal. The `CRON_SECRET` is used to secure your cron job endpoint and should be a long, random string, run `openssl rand -base64 32`.
 
-### 4. Run the Development Server
+### 4. Configure Vercel Cron Jobs
+
+To enable the automated payout system, add the following configuration to a `vercel.json` file in the root of your project:
+
+```json
+// vercel.json
+{
+  "crons": [
+    {
+      "path": "/api/cron/process-payouts",
+      "schedule": "0 5 * * *"
+    }
+  ]
+}
+```
+
+This schedule runs the job every day at 5:00 AM UTC.
+
+### 5. Run the Development Server
 
 ```bash
 npm run dev
@@ -135,54 +151,27 @@ npm run dev
 
 Your application should now be running at [http://localhost:3000](http://localhost:3000).
 
-## Available Scripts
-
-- `npm run dev`: Starts the development server.
-- `npm run build`: Creates a production-ready build of the application.
-- `npm run start`: Starts the production server.
-
 ## Project Structure
 
 ```
 .
 ├── app/
-│   ├── about/
-│   ├── account/
-│   ├── book/[id]/
 │   ├── admin/                    # Protected admin panel pages
-│   │   ├── books/
-│   │   ├── content/
-│   │   └── ...
 │   ├── api/                      # Backend API routes
 │   │   ├── admin/
-│   │   ├── books/
-│   │   ├── cart/
-│   │   ├── generate-description/ # AI content generation route
-│   │   ├── orders/
-│   │   ├── upload/               # Generates Cloudinary signatures
-│   │   └── webhooks/
-│   └── layout.tsx                # Root layout
+│   │   │   ├── stats/
+│   │   │   ├── payhero/
+│   │   │   └── payouts/
+│   │   ├── cron/                 # Cron job handler
+│   │   └── ...
+│   └── ...
 ├── components/
-│   ├── admin/
-│   │   ├── add-book-form.tsx
-│   │   ├── edit-book-form.tsx
-│   │   └── file-upload.tsx       # Reusable Cloudinary upload component
-│   ├── books/
-│   ├── cart/
-│   ├── layout/
-│   └── ui/                       # shadcn/ui components
-├── context/
-│   └── CartContext.tsx           # Hybrid cart state management
-├── lib/
-│   ├── data.ts                   # Centralized data fetching functions
-│   ├── db.ts                     # Database connection utility
-│   └── upload-utils.ts           # Client-side Cloudinary upload logic
+│   └── ...
 ├── models/
 │   ├── Book.ts
-│   ├── Cart.ts
 │   ├── Order.ts
-│   ├── SiteContent.ts
-│   └── User.ts
-├── public/                       # Static assets
-└── auth.ts                       # NextAuth.js configuration
+│   ├── PayoutConfig.ts           # New model for payouts
+│   └── ...
+├── vercel.json                   # Vercel configuration including crons
+└── ...
 ```
