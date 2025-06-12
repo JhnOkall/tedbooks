@@ -31,6 +31,13 @@ const normalizePhone = (phone: string) => phone.startsWith('0') ? `254${phone.su
  * @param config The IPayoutConfig document to process.
  * @returns A promise that resolves with the result of the withdrawal API call.
  */
+
+/**
+ * Processes a payout for a single employee configuration.
+ * Fetches current wallet balance, calculates percentage, deducts fees, and initiates withdrawal.
+ * @param config The IPayoutConfig document to process.
+ * @returns A promise that resolves with the result of the withdrawal API call.
+ */
 export async function processSinglePayout(config: IPayoutConfig) {
     // 1. Fetch current payments wallet balance
     const walletUrl = `https://backend.payhero.co.ke/api/v2/payment_channels/${process.env.PAYHERO_WALLET_CHANNEL_ID}`;
@@ -38,12 +45,19 @@ export async function processSinglePayout(config: IPayoutConfig) {
     const availableBalance = walletData.balance_plain?.balance || 0;
     console.log(`Processing payout for ${config.name}. Wallet Balance: KES ${availableBalance}`);
 
-    // 2. Calculate payout amount and fee
+    // 2. Calculate payout amount
     const payoutAmount = (availableBalance * config.payoutPercentage) / 100;
+
+    // --- The Fix: validation check ---
+    if (payoutAmount < 1) {
+        throw new Error(`Calculated payout (KES ${payoutAmount.toFixed(2)}) is less than the minimum of KES 1.00. Payout cannot proceed.`);
+    }
+    // --- End of Fix ---
+
+    // 3. Calculate the fee and check if the balance is sufficient
     const fee = getPayHeroFee(payoutAmount);
     const totalDeduction = payoutAmount + fee;
 
-    // 3. Check if balance is sufficient
     if (availableBalance < totalDeduction) {
         throw new Error(`Insufficient balance. Requires ${totalDeduction.toFixed(2)}, but only ${availableBalance.toFixed(2)} is available.`);
     }
@@ -64,7 +78,7 @@ export async function processSinglePayout(config: IPayoutConfig) {
         body: JSON.stringify(withdrawalPayload)
     });
 
-    console.log(`Payout of KES ${payoutAmount} initiated for ${config.name}.`);
+    console.log(`Payout of KES ${payoutAmount.toFixed(2)} initiated for ${config.name}.`);
 
     // 5. Update the config's last payout date
     config.lastPayoutDate = new Date();
