@@ -1,6 +1,6 @@
 /**
  * @file Defines the client-side form for editing an existing book.
- * It handles form state, submission, and uses the reusable FileUpload component.
+ * It handles form state, submission, AI generation, and uses the reusable FileUpload component.
  */
 
 "use client";
@@ -18,7 +18,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Save, Ban, Loader2, AlertCircle } from "lucide-react";
+// === MODIFICATION: Added Sparkles icon ===
+import { Save, Ban, Loader2, AlertCircle, Sparkles } from "lucide-react";
 import { FileUpload } from "./file-upload";
 
 interface EditBookFormProps {
@@ -34,11 +35,58 @@ export function EditBookForm({ book }: EditBookFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<IBook>>(book);
 
+  // === NEW: State for AI generation ===
+  const [isGenerating, setIsGenerating] = useState(false);
+
   const handleInputChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // === NEW: Handler for AI generation ===
+  const handleGenerateDescription = async () => {
+    if (!formData.title || !formData.author) {
+      toast.error("Title and Author must be present to generate content.");
+      return;
+    }
+    setIsGenerating(true);
+    setError(null);
+    toast.loading("Generating with AI...");
+
+    try {
+      const res = await fetch("/api/generate-description", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: formData.title,
+          author: formData.author,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "AI generation failed.");
+      }
+
+      const data = await res.json();
+
+      // Update form state with the generated content
+      setFormData((prev) => ({
+        ...prev,
+        description: data.description || "",
+        synopsis: data.synopsis || "",
+      }));
+
+      toast.dismiss();
+      toast.success("Description and synopsis regenerated!");
+    } catch (err: any) {
+      toast.dismiss();
+      setError(err.message);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -62,7 +110,7 @@ export function EditBookForm({ book }: EditBookFormProps) {
       toast.dismiss();
       toast.success("Book updated successfully!");
       router.push("/admin/books");
-      router.refresh(); // Important: Refresh server components to show updated data list
+      router.refresh();
     } catch (err: any) {
       toast.dismiss();
       setError(err.message);
@@ -82,7 +130,6 @@ export function EditBookForm({ book }: EditBookFormProps) {
           </Alert>
         )}
 
-        {/* Text Fields */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
@@ -92,7 +139,7 @@ export function EditBookForm({ book }: EditBookFormProps) {
               value={formData.title || ""}
               onChange={handleInputChange}
               required
-              disabled={isSubmitting}
+              disabled={isSubmitting || isGenerating} // === MODIFICATION ===
             />
           </div>
           <div className="space-y-2">
@@ -103,11 +150,38 @@ export function EditBookForm({ book }: EditBookFormProps) {
               value={formData.author || ""}
               onChange={handleInputChange}
               required
-              disabled={isSubmitting}
+              disabled={isSubmitting || isGenerating} // === MODIFICATION ===
             />
           </div>
         </div>
-        {/* ... other text inputs ... */}
+
+        {/* === NEW: AI Generation Button === */}
+        <div className="flex justify-start">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleGenerateDescription}
+            disabled={
+              !formData.title ||
+              !formData.author ||
+              isGenerating ||
+              isSubmitting
+            }
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Regenerating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Regenerate with AI
+              </>
+            )}
+          </Button>
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="description">Short Description</Label>
           <Textarea
@@ -117,11 +191,25 @@ export function EditBookForm({ book }: EditBookFormProps) {
             onChange={handleInputChange}
             rows={3}
             required
-            disabled={isSubmitting}
+            disabled={isSubmitting || isGenerating} // === MODIFICATION ===
           />
         </div>
 
-        {/* File Upload Fields */}
+        {/* === NEW: Synopsis Field === */}
+        <div className="space-y-2">
+          <Label htmlFor="synopsis">Full Synopsis</Label>
+          <Textarea
+            name="synopsis"
+            id="synopsis"
+            value={formData.synopsis || ""}
+            onChange={handleInputChange}
+            rows={6}
+            required
+            disabled={isSubmitting || isGenerating}
+            placeholder="Detailed synopsis of the book"
+          />
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FileUpload
             label="Cover Image"
@@ -135,7 +223,7 @@ export function EditBookForm({ book }: EditBookFormProps) {
             onRemove={() =>
               setFormData((prev) => ({ ...prev, coverImage: book.coverImage }))
             }
-            disabled={isSubmitting}
+            disabled={isSubmitting || isGenerating} // === MODIFICATION ===
           />
           <FileUpload
             label="Book File"
@@ -150,7 +238,7 @@ export function EditBookForm({ book }: EditBookFormProps) {
             onRemove={() =>
               setFormData((prev) => ({ ...prev, fileUrl: book.fileUrl }))
             }
-            disabled={isSubmitting}
+            disabled={isSubmitting || isGenerating} // === MODIFICATION ===
           />
         </div>
 
@@ -161,7 +249,7 @@ export function EditBookForm({ book }: EditBookFormProps) {
             onCheckedChange={(checked) =>
               setFormData((prev) => ({ ...prev, featured: !!checked }))
             }
-            disabled={isSubmitting}
+            disabled={isSubmitting || isGenerating} // === MODIFICATION ===
           />
           <Label htmlFor="featured" className="font-normal cursor-pointer">
             Mark as Featured Book
@@ -177,7 +265,7 @@ export function EditBookForm({ book }: EditBookFormProps) {
         <Button
           type="submit"
           className="rounded-lg shadow-md"
-          disabled={isSubmitting}
+          disabled={isSubmitting || isGenerating} // === MODIFICATION ===
         >
           {isSubmitting ? (
             <>

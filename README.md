@@ -1,6 +1,6 @@
 # TedBooks - A Full-Stack E-commerce Bookstore
 
-TedBooks is a modern, full-stack e-commerce application designed for selling digital books. Built with the Next.js App Router, it features a complete user authentication system, a powerful admin dashboard for managing content, and a seamless payment integration with PayHero.
+TedBooks is a modern, full-stack e-commerce application designed for selling digital books. Built with the Next.js App Router, it features a complete user authentication system, a powerful admin dashboard for managing content **(now supercharged with AI to automatically generate book descriptions and synopses)**, and a seamless payment integration with PayHero.
 
 ![TedBooks Screenshot (Conceptual)](https://75rfypg2otkow6jl.public.blob.vercel-storage.com/Screenshot%202025-06-07%20154800-QlM51gxoVZrvCvPg3fcI3wgB1pkegA.png)
 
@@ -36,6 +36,7 @@ TedBooks is a modern, full-stack e-commerce application designed for selling dig
 - **Book Management (CRUD):**
   - Add, view, edit, and delete books.
   - **Signed Direct Uploads:** Upload book covers and digital book files (PDFs, EPUBs) directly to **Cloudinary**, bypassing server payload limits.
+- **AI-Powered Content Generation:** With the click of a button, admins can use **Google's Gemini API** to automatically generate compelling book descriptions and synopses directly from the book's title and author, saving significant time on content creation.
 - **Order Management:** View all customer orders and update their status (e.g., from 'Pending' to 'Completed').
 - **Site Content Management:** Dynamically edit the content of static pages like "About Us" without needing to redeploy.
 
@@ -45,6 +46,7 @@ TedBooks is a modern, full-stack e-commerce application designed for selling dig
 - **Styling:** Tailwind CSS with shadcn/ui
 - **Database:** MongoDB with Mongoose
 - **Authentication:** NextAuth.js (Auth.js v5) with Google Provider
+- **AI Content Generation:** **Google Gemini API**
 - **File Storage:** **Cloudinary** (for robust, scalable file storage)
 - **Payments:** PayHero (Button SDK & Server-side API)
 - **State Management:** React Context API (`useContext`) for cart state
@@ -58,6 +60,7 @@ Before you begin, ensure you have the following set up:
 - `npm`, `yarn`, or `pnpm`
 - A MongoDB database instance (e.g., a free cluster on [MongoDB Atlas](https://www.mongodb.com/cloud/atlas))
 - A Google Cloud project with OAuth 2.0 credentials enabled.
+- A **[Google AI Studio](https://aistudio.google.com/)** account to get a Gemini API key.
 - A **[Cloudinary](https://cloudinary.com/)** account with API credentials.
 - A [PayHero](https://payhero.co.ke/) account with API credentials and a Lipwa link.
 
@@ -68,13 +71,13 @@ Follow these steps to get your local development environment running.
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/tedbooks.git
+git clone https://github.com/JhnOkall/tedbooks.git
 cd tedbooks
 ```
 
 ### 2. Install Dependencies
 
-You will need the `cloudinary` package for this setup.
+You will need the `@google/generative-ai` and `cloudinary` packages for this setup.
 
 ```bash
 npm install
@@ -103,6 +106,9 @@ NEXT_PUBLIC_BASE_URL='http://localhost:3000'
 
 # MongoDB Connection String
 MONGODB_URI='your_mongodb_connection_string'
+
+# Google Gemini API Key (for AI content generation)
+GEMINI_API_KEY='your_gemini_api_key_here'
 
 # Cloudinary Credentials (for signed uploads)
 CLOUDINARY_CLOUD_NAME='your_cloudinary_cloud_name'
@@ -151,6 +157,7 @@ Your application should now be running at [http://localhost:3000](http://localho
 │   │   ├── admin/
 │   │   ├── books/
 │   │   ├── cart/
+│   │   ├── generate-description/ # AI content generation route
 │   │   ├── orders/
 │   │   ├── upload/               # Generates Cloudinary signatures
 │   │   └── webhooks/
