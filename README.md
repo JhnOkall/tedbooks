@@ -39,11 +39,11 @@ TedBooks is a modern, full-stack e-commerce application designed for selling dig
 - **AI-Powered Content Generation:** With the click of a button, admins can use **Google's Gemini API** to automatically generate compelling book descriptions and synopses directly from the book's title and author, saving significant time on content creation.
 - **Order Management:** View all customer orders and update their status (e.g., from 'Pending' to 'Completed').
 - **Site Content Management:** Dynamically edit the content of static pages like "About Us" without needing to redeploy.
-- **Automated Payout System:**
-  - Configure employee/contractor payouts (name, phone, percentage).
-  - Set payout frequency to weekly or monthly.
-  - **Vercel Cron Jobs** automatically trigger a secure API endpoint daily to process scheduled payouts.
-  - The system calculates payouts based on a percentage of the current Payments Wallet balance and dispatches funds via the PayHero B2C API.
+- **Automated & Manual Payouts:**
+  - Configure employee/contractor payouts with specific percentages and frequencies (weekly/monthly).
+  - **Automated Payouts:** A secure **Vercel Cron Job** runs daily to automatically process scheduled payouts based on the current wallet balance.
+  - **Manual Payouts:** An admin can trigger an immediate "Pay Now" for any configured employee, providing flexibility for off-cycle payments and testing.
+  - All payouts are dispatched securely via the PayHero B2C API, with transaction fees calculated server-side.
 
 ## Tech Stack
 
@@ -161,16 +161,21 @@ Your application should now be running at [http://localhost:3000](http://localho
 │   │   ├── admin/
 │   │   │   ├── stats/
 │   │   │   ├── payhero/
-│   │   │   └── payouts/
+│   │   │   └── payouts/          # Manage payout configs
+│   │   │       └── [id]/
+│   │   │           └── payout-now/ # Trigger manual payout
 │   │   ├── cron/                 # Cron job handler
 │   │   └── ...
 │   └── ...
 ├── components/
 │   └── ...
+├── lib/
+│   ├── payout-utils.ts           # Reusable payout logic
+│   └── ...
 ├── models/
 │   ├── Book.ts
 │   ├── Order.ts
-│   ├── PayoutConfig.ts           # New model for payouts
+│   ├── PayoutConfig.ts           # Model for payouts
 │   └── ...
 ├── vercel.json                   # Vercel configuration including crons
 └── ...

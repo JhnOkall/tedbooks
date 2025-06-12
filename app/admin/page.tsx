@@ -2,7 +2,7 @@
  * @file This file defines the main Admin Dashboard page and its sub-components.
  * It is a client component that fetches and displays key metrics from both the
  * internal database and the external PayHero payment service, and allows for
- * management of automated payouts.
+ * management of automated and manual employee payouts.
  */
 
 "use client";
@@ -43,6 +43,7 @@ import {
   Landmark,
   Fuel,
   Trash2,
+  Coins,
 } from "lucide-react";
 
 /**
@@ -87,8 +88,12 @@ export default function AdminDashboardPage() {
   );
   const [isLoading, setIsLoading] = useState(true);
 
+  /**
+   * Fetches all required dashboard data in parallel from the relevant API endpoints.
+   * Can be called to refresh all data on the dashboard.
+   */
   const fetchDashboardData = async () => {
-    // No need to set loading to true on manual refresh if data already exists
+    // Only show the main loader on the initial fetch
     if (!stats) setIsLoading(true);
 
     try {
@@ -130,7 +135,6 @@ export default function AdminDashboardPage() {
         </p>
       </header>
 
-      {/* Internal Application Statistics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           icon={<BookOpen />}
@@ -154,16 +158,13 @@ export default function AdminDashboardPage() {
         />
       </div>
 
-      {/* External PayHero Service Statistics */}
       <div className="grid gap-4 md:grid-cols-3">
         <PayHeroWalletsCard wallets={wallets} />
         <TopUpCard onSuccessfulTopUp={fetchDashboardData} />
       </div>
 
-      {/* Payout Management Section */}
-      <PayoutManagementCard />
+      <PayoutManagementCard onPayoutSuccess={fetchDashboardData} />
 
-      {/* Recent Transactions from PayHero */}
       <RecentTransactionsTable data={transactions} />
     </div>
   );
@@ -201,34 +202,30 @@ function PayHeroWalletsCard({ wallets }: { wallets: Wallets | null }) {
         <CardDescription>Your current account balances.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex justify-between items-center p-3 border rounded-lg">
-          <div className="flex items-center space-x-3">
-            <Fuel className="h-6 w-6 text-blue-500" />
-            <div>
-              <p className="text-sm text-muted-foreground">Service Wallet</p>
-              <p className="text-xl font-bold">
-                {wallets ? (
-                  formatCurrency(wallets.serviceBalance)
-                ) : (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                )}
-              </p>
-            </div>
+        <div className="flex items-center space-x-3 p-3 border rounded-lg">
+          <Fuel className="h-6 w-6 text-blue-500" />
+          <div>
+            <p className="text-sm text-muted-foreground">Service Wallet</p>
+            <p className="text-xl font-bold">
+              {wallets ? (
+                formatCurrency(wallets.serviceBalance)
+              ) : (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              )}
+            </p>
           </div>
         </div>
-        <div className="flex justify-between items-center p-3 border rounded-lg">
-          <div className="flex items-center space-x-3">
-            <Landmark className="h-6 w-6 text-green-500" />
-            <div>
-              <p className="text-sm text-muted-foreground">Payments Wallet</p>
-              <p className="text-xl font-bold">
-                {wallets ? (
-                  formatCurrency(wallets.paymentsBalance)
-                ) : (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                )}
-              </p>
-            </div>
+        <div className="flex items-center space-x-3 p-3 border rounded-lg">
+          <Landmark className="h-6 w-6 text-green-500" />
+          <div>
+            <p className="text-sm text-muted-foreground">Payments Wallet</p>
+            <p className="text-xl font-bold">
+              {wallets ? (
+                formatCurrency(wallets.paymentsBalance)
+              ) : (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              )}
+            </p>
           </div>
         </div>
       </CardContent>
@@ -259,7 +256,7 @@ function TopUpCard({ onSuccessfulTopUp }: { onSuccessfulTopUp: () => void }) {
       toast.success("STK push sent!", {
         description: "Enter your PIN to complete.",
       });
-      setTimeout(onSuccessfulTopUp, 30000);
+      setTimeout(onSuccessfulTopUp, 30000); // Refresh balance after 30s for confirmation
     } catch (error: any) {
       toast.error("Top-up Failed", { description: error.message });
     } finally {
@@ -308,10 +305,17 @@ function TopUpCard({ onSuccessfulTopUp }: { onSuccessfulTopUp: () => void }) {
   );
 }
 
-function PayoutManagementCard() {
+function PayoutManagementCard({
+  onPayoutSuccess,
+}: {
+  onPayoutSuccess: () => void;
+}) {
   const [configs, setConfigs] = useState<PayoutConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [payoutInProgressId, setPayoutInProgressId] = useState<string | null>(
+    null
+  );
 
   const fetchConfigs = async () => {
     setIsLoading(true);
@@ -353,15 +357,37 @@ function PayoutManagementCard() {
   };
 
   const handleDeleteConfig = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this configuration?")) return;
+    if (!confirm("Are you sure? This cannot be undone.")) return;
     toast.promise(fetch(`/api/admin/payouts/${id}`, { method: "DELETE" }), {
       loading: "Deleting...",
       success: () => {
-        fetchConfigs(); // Refresh list on success
+        fetchConfigs();
         return "Configuration deleted.";
       },
       error: "Deletion failed.",
     });
+  };
+
+  const handlePayoutNow = async (configId: string, configName: string) => {
+    setPayoutInProgressId(configId);
+    toast.promise(
+      fetch(`/api/admin/payouts/${configId}/payout-now`, {
+        method: "POST",
+      }).then(async (res) => {
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.message);
+        }
+        onPayoutSuccess(); // Refresh dashboard wallet balances
+        return `Payout for ${configName} initiated!`;
+      }),
+      {
+        loading: `Initiating payout for ${configName}...`,
+        success: (message) => message,
+        error: (err) => err.message || "An unexpected error occurred.",
+        finally: () => setPayoutInProgressId(null),
+      }
+    );
   };
 
   const totalPercentage = configs.reduce(
@@ -374,10 +400,10 @@ function PayoutManagementCard() {
       <CardHeader>
         <CardTitle>Payout Management</CardTitle>
         <CardDescription>
-          Configure automated payouts from the payments wallet.
+          Configure automated & manual payouts from the payments wallet.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid md:grid-cols-3 gap-6">
+      <CardContent className="grid md:grid-cols-3 gap-8">
         <form onSubmit={handleAddConfig} className="md:col-span-1 space-y-4">
           <h3 className="font-semibold">Add New Employee</h3>
           <Input
@@ -419,7 +445,11 @@ function PayoutManagementCard() {
         <div className="md:col-span-2">
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-semibold">Current Configurations</h3>
-            <p className="text-sm font-bold text-primary">
+            <p
+              className={`text-sm font-bold ${
+                totalPercentage > 100 ? "text-destructive" : "text-primary"
+              }`}
+            >
               Total Allocated: {totalPercentage.toFixed(1)}%
             </p>
           </div>
@@ -428,9 +458,11 @@ function PayoutManagementCard() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Frequency</TableHead>
+                  <TableHead className="hidden sm:table-cell">
+                    Frequency
+                  </TableHead>
                   <TableHead className="text-right">%</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -443,21 +475,41 @@ function PayoutManagementCard() {
                 ) : (
                   configs.map((c) => (
                     <TableRow key={c._id}>
-                      <TableCell>{c.name}</TableCell>
-                      <TableCell className="capitalize">
+                      <TableCell className="font-medium">
+                        {c.name}
+                        <br />
+                        <span className="text-xs text-muted-foreground">
+                          {c.phone}
+                        </span>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell capitalize">
                         {c.payoutFrequency}
                       </TableCell>
                       <TableCell className="text-right">
                         {c.payoutPercentage}%
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteConfig(c._id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                      <TableCell className="text-center">
+                        <div className="flex justify-center items-center space-x-1">
+                          {payoutInProgressId === c._id ? (
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePayoutNow(c._id, c.name)}
+                            >
+                              <Coins className="mr-2 h-4 w-4" /> Pay Now
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteConfig(c._id)}
+                            disabled={!!payoutInProgressId}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -485,8 +537,10 @@ function RecentTransactionsTable({ data }: { data: TransactionData | null }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Type</TableHead>
-                <TableHead>Description</TableHead>
+                <TableHead className="hidden sm:table-cell">Type</TableHead>
+                <TableHead className="hidden sm:table-cell">
+                  Description
+                </TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
               </TableRow>
@@ -495,10 +549,12 @@ function RecentTransactionsTable({ data }: { data: TransactionData | null }) {
               {data?.transactions.length ? (
                 data.transactions.map((tx) => (
                   <TableRow key={tx.id}>
-                    <TableCell className="font-medium capitalize">
+                    <TableCell className="hidden sm:table-cell font-medium capitalize">
                       {tx.transaction_type.replace(/_/g, " ")}
                     </TableCell>
-                    <TableCell>{tx.description}</TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      {tx.description}
+                    </TableCell>
                     <TableCell>
                       {new Date(tx.created_at).toLocaleDateString()}
                     </TableCell>
