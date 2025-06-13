@@ -27,16 +27,35 @@ import { Loader2 } from "lucide-react";
  * Augments the global `Window` interface to include the `PayHero` SDK object.
  * This provides type safety when interacting with the external script.
  */
-interface Window {
-  PayHero: {
-    init: (config: any) => void;
-    // TODO: Define a specific type for the PayHero configuration object instead of `any`
-    // to improve type safety and provide better autocompletion.
-  };
+declare global {
+  interface Window {
+    PayHero?: {
+      init: (config: PayHeroConfig) => void;
+      show?: () => void;
+      hide?: () => void;
+    };
+  }
 }
 
-// Informs TypeScript that `PayHero` will be available on the global `window` object.
-declare const PayHero: Window["PayHero"];
+/**
+ * PayHero configuration interface for better type safety
+ */
+interface PayHeroConfig {
+  paymentUrl: string;
+  containerId: string;
+  channelID: number;
+  amount: number;
+  phone: string;
+  name: string;
+  reference: string;
+  buttonName: string;
+  buttonColor: string;
+  width: string;
+  height: string;
+  successUrl?: string | null;
+  failedUrl?: string | null;
+  callbackUrl: string;
+}
 
 /**
  * A client component that displays the cart summary and orchestrates the entire
@@ -55,46 +74,129 @@ export function CartSummary() {
     customId: string;
   } | null>(null);
   /** A ref to track if the external PayHero SDK script has successfully loaded. */
-  const sdkLoaded = useRef(false);
+  const [sdkLoaded, setSdkLoaded] = useState(false);
+  /** Ref to track initialization attempts */
+  const initializationAttempted = useRef(false);
 
   /**
    * Callback function executed when the PayHero SDK script has finished loading.
+   * Includes better error handling and SDK availability checking.
    */
   const handleScriptLoad = () => {
-    sdkLoaded.current = true;
+    console.log("PayHero script loaded");
+
+    // Add a small delay to ensure the SDK is fully initialized
+    setTimeout(() => {
+      if (typeof window !== "undefined" && window.PayHero) {
+        setSdkLoaded(true);
+        console.log("PayHero SDK is now available");
+      } else {
+        console.error("PayHero SDK failed to initialize properly");
+        // Try to check again after a longer delay
+        setTimeout(() => {
+          if (typeof window !== "undefined" && window.PayHero) {
+            setSdkLoaded(true);
+            console.log("PayHero SDK is now available (delayed)");
+          } else {
+            toast.error(
+              "Payment system failed to load. Please refresh the page."
+            );
+          }
+        }, 2000);
+      }
+    }, 1000);
+  };
+
+  /**
+   * Handle script loading errors
+   */
+  const handleScriptError = () => {
+    console.error("Failed to load PayHero SDK script");
+    toast.error("Payment system failed to load. Please refresh the page.");
   };
 
   /**
    * Initializes the PayHero payment widget with the necessary configuration.
    * @param {string} orderReference - The unique custom ID of the order being paid for.
-   * @returns {boolean} - True if initialization was successful, false otherwise.
+   * @returns {Promise<boolean>} - True if initialization was successful, false otherwise.
    */
-  const initializePayHero = (orderReference: string): boolean => {
-    if (!sdkLoaded.current || typeof PayHero === "undefined") {
+  const initializePayHero = async (
+    orderReference: string
+  ): Promise<boolean> => {
+    if (!sdkLoaded || typeof window === "undefined" || !window.PayHero) {
       console.error("PayHero SDK is not loaded or available.");
       return false;
     }
 
-    PayHero.init({
-      paymentUrl: process.env.NEXT_PUBLIC_PAYHERO_LIPWA_URL!,
-      containerId: "payHeroContainer",
-      channelID: parseInt(process.env.NEXT_PUBLIC_PAYHERO_CHANNEL_ID!, 10),
-      amount: totalPrice,
-      phone: session?.user?.phone || "",
-      name: session?.user?.name || "Valued Customer",
-      reference: orderReference,
-      buttonName: `Pay Now KES ${totalPrice.toFixed(2)}`,
-      buttonColor: process.env.NEXT_PUBLIC_PAYHERO_BUTTON_COLOR!,
-      width: "100%",
-      height: "48px",
-      successUrl: null, // Using postMessage for callbacks instead of redirects.
-      failedUrl: null, // Using postMessage for callbacks instead of redirects.
-      callbackUrl: `${window.location.origin}/api/webhooks/payhero`,
-    });
-    // TODO: The server-side webhook at `/api/webhooks/payhero` must be secured to
-    // validate the legitimacy of incoming payment notifications from PayHero.
+    if (initializationAttempted.current) {
+      console.log("PayHero already initialized, skipping...");
+      return true;
+    }
 
-    return true;
+    try {
+      const config: PayHeroConfig = {
+        paymentUrl: process.env.NEXT_PUBLIC_PAYHERO_LIPWA_URL!,
+        containerId: "payHeroContainer",
+        channelID: parseInt(process.env.NEXT_PUBLIC_PAYHERO_CHANNEL_ID!, 10),
+        amount: totalPrice,
+        phone: session?.user?.phone || "",
+        name: session?.user?.name || "Valued Customer",
+        reference: orderReference,
+        buttonName: `Pay Now KES ${totalPrice.toFixed(2)}`,
+        buttonColor: process.env.NEXT_PUBLIC_PAYHERO_BUTTON_COLOR!,
+        width: "100%",
+        height: "48px",
+        successUrl: null,
+        failedUrl: null,
+        callbackUrl: `${window.location.origin}/api/webhooks/payhero`,
+      };
+
+      console.log("Initializing PayHero with config:", config);
+      window.PayHero.init(config);
+      initializationAttempted.current = true;
+
+      // Wait a bit for the button to be rendered
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      return true;
+    } catch (error) {
+      console.error("Error initializing PayHero:", error);
+      return false;
+    }
+  };
+
+  /**
+   * Triggers the PayHero payment button with better error handling
+   */
+  const triggerPayHeroButton = async (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      let attempts = 0;
+      const maxAttempts = 10;
+      const checkInterval = 500;
+
+      const checkForButton = () => {
+        const payHeroButton = document.querySelector(
+          "#payHeroContainer button"
+        ) as HTMLButtonElement;
+
+        if (payHeroButton) {
+          console.log("PayHero button found, clicking...");
+          payHeroButton.click();
+          resolve(true);
+        } else if (attempts < maxAttempts) {
+          attempts++;
+          console.log(
+            `PayHero button not found, attempt ${attempts}/${maxAttempts}`
+          );
+          setTimeout(checkForButton, checkInterval);
+        } else {
+          console.error("PayHero button not found after maximum attempts");
+          resolve(false);
+        }
+      };
+
+      checkForButton();
+    });
   };
 
   /**
@@ -103,7 +205,7 @@ export function CartSummary() {
    */
   const handlePaymentSuccess = () => {
     if (!pendingOrder) return;
-    toast.loading("Payment received! Finalizing your order...");
+    toast.success("Payment successful!");
     clearCart();
     router.push(`/order/success?orderId=${pendingOrder.id}`);
   };
@@ -117,6 +219,8 @@ export function CartSummary() {
       description: "Your payment could not be processed. Please try again.",
     });
     setIsProcessing(false);
+    setPendingOrder(null);
+    initializationAttempted.current = false;
   };
 
   /**
@@ -136,11 +240,10 @@ export function CartSummary() {
     }
 
     setIsProcessing(true);
-    toast.loading("Preparing your order...");
+    const loadingToast = toast.loading("Preparing your order...");
 
     try {
       // Step 1: Create a "Pending" order in the local database.
-      // This ensures we have a record of the transaction attempt.
       const orderPayload = {
         items: cartItems.map((item) => ({
           bookId: item._id,
@@ -154,7 +257,10 @@ export function CartSummary() {
         body: JSON.stringify(orderPayload),
       });
 
-      if (!res.ok) throw new Error("Could not create an order.");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Could not create an order.");
+      }
 
       const newPendingOrder = await res.json();
       setPendingOrder({
@@ -162,29 +268,36 @@ export function CartSummary() {
         customId: newPendingOrder.customId,
       });
 
+      toast.dismiss(loadingToast);
+      toast.loading("Initializing payment...");
+
       // Step 2: Initialize the PayHero payment SDK.
-      const paymentInitialized = initializePayHero(newPendingOrder.customId);
+      const paymentInitialized = await initializePayHero(
+        newPendingOrder.customId
+      );
       if (!paymentInitialized) {
         throw new Error("Failed to initialize payment system.");
       }
-      toast.dismiss();
 
-      // Step 3: Programmatically trigger the PayHero button, which is mounted in a hidden div.
-      // TODO: This `setTimeout` is a workaround. Explore if the SDK provides a more direct
-      // invocation method (e.g., `PayHero.show()`) to avoid timing issues.
-      setTimeout(() => {
-        const payHeroButton = document.querySelector(
-          "#payHeroContainer button"
-        );
-        if (payHeroButton) {
-          (payHeroButton as HTMLButtonElement).click();
-        } else {
-          throw new Error("Payment button could not be found in the DOM.");
-        }
-      }, 500);
+      toast.dismiss();
+      toast.loading("Opening payment dialog...");
+
+      // Step 3: Trigger the PayHero button
+      const buttonTriggered = await triggerPayHeroButton();
+      if (!buttonTriggered) {
+        throw new Error("Payment dialog could not be opened.");
+      }
+
+      toast.dismiss();
     } catch (error: any) {
-      toast.error("Checkout Failed", { description: error.message });
+      console.error("Checkout error:", error);
+      toast.dismiss();
+      toast.error("Checkout Failed", {
+        description: error.message || "An unexpected error occurred.",
+      });
       setIsProcessing(false);
+      setPendingOrder(null);
+      initializationAttempted.current = false;
     }
   };
 
@@ -194,6 +307,18 @@ export function CartSummary() {
    */
   useEffect(() => {
     const handlePaymentMessage = (event: MessageEvent) => {
+      // Validate the origin for security
+      const allowedOrigins = [
+        "https://applet.payherokenya.com",
+        "https://api.payherokenya.com",
+      ];
+
+      if (!allowedOrigins.some((origin) => event.origin.startsWith(origin))) {
+        return; // Ignore messages from unknown origins
+      }
+
+      console.log("Received payment message:", event.data);
+
       // Check for the specific success flag from the PayHero SDK message.
       if (event.data?.paymentSuccess === true) {
         handlePaymentSuccess();
@@ -208,15 +333,23 @@ export function CartSummary() {
     return () => {
       window.removeEventListener("message", handlePaymentMessage);
     };
-  }, [pendingOrder]); // Re-bind if pendingOrder changes, though it's mostly for closure correctness.
+  }, [pendingOrder]);
+
+  // Reset initialization state when SDK loads
+  useEffect(() => {
+    if (sdkLoaded) {
+      initializationAttempted.current = false;
+    }
+  }, [sdkLoaded]);
 
   return (
     <>
-      {/* Lazily loads the external PayHero SDK script when the component mounts. */}
+      {/* Load the external PayHero SDK script */}
       <Script
         src="https://applet.payherokenya.com/cdn/button_sdk.js?v=3.1"
         onLoad={handleScriptLoad}
-        strategy="lazyOnload"
+        onError={handleScriptError}
+        strategy="afterInteractive"
       />
 
       <Card className="rounded-lg shadow-md">
@@ -241,16 +374,24 @@ export function CartSummary() {
             size="lg"
             className="w-full rounded-lg text-lg shadow-md"
             onClick={handlePayment}
-            disabled={cartItems.length === 0 || isProcessing}
+            disabled={cartItems.length === 0 || isProcessing || !sdkLoaded}
           >
             {isProcessing && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-            Pay
+            {!sdkLoaded ? "Loading Payment System..." : "Pay"}
           </Button>
         </CardFooter>
       </Card>
 
-      {/* This hidden container is the mount point for the PayHero SDK's button. */}
-      <div id="payHeroContainer" className="hidden"></div>
+      {/* This container is the mount point for the PayHero SDK's button. */}
+      <div
+        id="payHeroContainer"
+        className="hidden"
+        style={{
+          position: "absolute",
+          left: "-9999px",
+          top: "-9999px",
+        }}
+      ></div>
     </>
   );
 }
