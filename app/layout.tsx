@@ -52,7 +52,6 @@ export const metadata: Metadata = {
   },
 
   // --- Favicons and App Icons ---
-  // Place these files in your /public directory, or use the /app directory convention.
   icons: {
     icon: "/favicon.ico",
     shortcut: "/favicon-96x96.png",

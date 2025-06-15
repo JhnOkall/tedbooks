@@ -32,7 +32,7 @@ export function Providers({ children }: { children: ReactNode }): JSX.Element {
         - `defaultTheme="system"` sets the initial theme based on the user's OS preference.
         - `enableSystem` allows the "system" theme option to work correctly.
       */}
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
         {/*
           Custom context provider for managing the application-wide shopping cart state and actions.
           It is placed inside the SessionProvider to potentially access session data.
