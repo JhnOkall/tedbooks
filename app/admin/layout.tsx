@@ -18,6 +18,8 @@ import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 
 /**
  * Defines the props accepted by the AdminLayout component.
@@ -96,7 +98,22 @@ const NavLinks = () => (
  * @param {AdminLayoutProps} props - The props for the component.
  * @returns {JSX.Element} The rendered admin layout with page content.
  */
-export default function AdminLayout({ children }: AdminLayoutProps) {
+export default async function AdminLayout({ children }: AdminLayoutProps) {
+  /**
+   * Fetches the user's session on the server. This is the first step in
+   * securing the admin panel.
+   */
+  const session = await auth();
+
+  /**
+   * A critical server-side security check. This gatekeeping logic ensures that
+   * only authenticated users with the specific role of 'admin' can access any
+   * page wrapped by this layout. If the check fails, the user is immediately
+   * redirected to the sign-in page with a callback URL.
+   */
+  if (!session || session.user?.role !== "admin") {
+    redirect("/");
+  }
   return (
     <div className="min-h-screen w-full flex flex-col bg-muted/40">
       <div className="flex min-h-screen w-full">
