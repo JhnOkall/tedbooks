@@ -7,6 +7,16 @@
 
 import type { NextConfig } from 'next';
 
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.paystack.co",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: https://placehold.co https://75rfypg2otkow6jl.public.blob.vercel-storage.com https://res.cloudinary.com",
+  "font-src 'self'",
+  "frame-src 'self' https://checkout.paystack.com https://js.paystack.co",
+  "connect-src 'self' https://api.paystack.co",
+].join('; ');
+
 const nextConfig: NextConfig = {
   /**
    * TypeScript configuration for the Next.js build process.
@@ -36,31 +46,38 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
-        // Allows placeholder images from 'placehold.co' for development and testing purposes.
         protocol: 'https',
         hostname: 'placehold.co',
         port: '',
         pathname: '/**',
       },
       {
-        // Whitelists the Vercel Blob storage service, which is used for hosting production assets like book cover images.
         protocol: 'https',
         hostname: '75rfypg2otkow6jl.public.blob.vercel-storage.com',
         port: '',
         pathname: '/**',
-        // TODO: This Vercel Blob hostname is project-specific. If the project is moved or the blob store
-        // is reconfigured, this value will need to be updated. Consider moving this to an environment
-        // variable for easier management across different environments.
       },
       {
-        // Whitelists the Cloudinary CDN, which is now used for hosting production assets like book cover images.
-        // This allows `next/image` to securely fetch and optimize images from your Cloudinary account.
         protocol: 'https',
         hostname: 'res.cloudinary.com',
         port: '',
         pathname: '/**',
       },
     ],
+  },
+  
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: CSP,
+          },
+        ],
+      },
+    ];
   },
 };
 
