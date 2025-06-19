@@ -1,5 +1,3 @@
-// components/cart/CartSummary.tsx (Updated version)
-
 "use client";
 
 import { useState } from "react";
@@ -35,10 +33,10 @@ interface PaystackConfig {
   amount: number;
   currency: string;
   ref: string;
-  subaccount: string;
-  metadata: {
+  subaccount?: string;
+  metadata?: {
     orderId: string;
-    subaccount: string;
+    subaccount?: string;
     [key: string]: any;
   };
   callback: (response: any) => void;
@@ -108,6 +106,14 @@ export function CartSummary() {
       return;
     }
 
+    // Validate required environment variables
+    const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
+    if (!paystackPublicKey) {
+      console.error("Missing NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY");
+      toast.error("Payment configuration error. Please contact support.");
+      return;
+    }
+
     setProcessingState("creating_order");
     const loadingToast = toast.loading("Preparing your order...");
 
@@ -131,21 +137,21 @@ export function CartSummary() {
       const orderId = newPendingOrder._id;
       const orderReference = newPendingOrder.customId;
 
+      // Validate order data
+      if (!orderId || !orderReference) {
+        throw new Error("Invalid order data received");
+      }
+
       toast.dismiss(loadingToast);
       setProcessingState("awaiting_payment");
 
-      const paystackHandler = window.PaystackPop.setup({
-        key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY!,
+      // Build the Paystack configuration
+      const paystackConfig: PaystackConfig = {
+        key: paystackPublicKey,
         email: session.user.email,
-        amount: Math.round(totalPrice * 100),
+        amount: Math.round(totalPrice * 100), // Convert to kobo/cents
         currency: "KES",
         ref: orderReference,
-        subaccount: process.env.NEXT_PUBLIC_TEDBOOKS_SUBACCOUNT_CODE!,
-        metadata: {
-          orderId: orderId,
-          subaccount: process.env.NEXT_PUBLIC_TEDBOOKS_SUBACCOUNT_CODE!,
-          customer_name: session.user.name || "Valued Customer",
-        },
         callback: async (response) => {
           // Payment was successful on the client, now verify on the server.
           setProcessingState("verifying");
@@ -176,13 +182,52 @@ export function CartSummary() {
             setProcessingState("idle");
           }
         },
+      };
+
+      // Add subaccount and metadata only if subaccount is configured
+      const subaccountCode = process.env.NEXT_PUBLIC_TEDBOOKS_SUBACCOUNT_CODE;
+      if (subaccountCode) {
+        paystackConfig.subaccount = subaccountCode;
+        paystackConfig.metadata = {
+          orderId: orderId,
+          subaccount: subaccountCode,
+          customer_name: session.user.name || "Valued Customer",
+        };
+      } else {
+        // Basic metadata without subaccount
+        paystackConfig.metadata = {
+          orderId: orderId,
+          customer_name: session.user.name || "Valued Customer",
+        };
+      }
+
+      // Validate final configuration
+      if (
+        !paystackConfig.key ||
+        !paystackConfig.email ||
+        !paystackConfig.amount ||
+        !paystackConfig.ref
+      ) {
+        throw new Error("Invalid payment configuration");
+      }
+
+      console.log("Paystack config:", {
+        key: paystackConfig.key ? "✓ Present" : "✗ Missing",
+        email: paystackConfig.email,
+        amount: paystackConfig.amount,
+        currency: paystackConfig.currency,
+        ref: paystackConfig.ref,
+        subaccount: paystackConfig.subaccount ? "✓ Present" : "Not configured",
       });
 
+      const paystackHandler = window.PaystackPop.setup(paystackConfig);
       paystackHandler.openIframe();
     } catch (error: any) {
       console.error("Checkout error:", error);
       toast.dismiss();
-      toast.error("Checkout Failed", { description: error.message });
+      toast.error("Checkout Failed", {
+        description: error.message || "An unexpected error occurred",
+      });
       setProcessingState("idle");
     }
   };
@@ -208,7 +253,6 @@ export function CartSummary() {
         <CardTitle className="text-2xl">Order Summary</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* ... Card content ... */}
         <div className="flex justify-between items-center">
           <span className="text-muted-foreground">
             Subtotal ({totalItems} items)
