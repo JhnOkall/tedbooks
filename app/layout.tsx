@@ -8,6 +8,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
 import { JSX } from "react";
+import Script from "next/script";
 
 const siteUrl =
   process.env.NEXT_PUBLIC_BASE_URL || "https://tedbooks.vercel.app";
@@ -91,6 +92,8 @@ export default function RootLayout({
     // to prevent a React warning about server/client mismatch for the theme attribute.
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="preconnect" href="https://js.paystack.co" />
+        <link rel="dns-prefetch" href="//js.paystack.co" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -135,6 +138,10 @@ export default function RootLayout({
           root layout into a client component.
         */}
         <Providers>{children}</Providers>
+        <Script
+          src="https://js.paystack.co/v2/inline.js"
+          strategy="lazyOnload"
+        />
       </body>
     </html>
   );
