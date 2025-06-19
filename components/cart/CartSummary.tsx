@@ -1,3 +1,6 @@
+// tedbooks.vercel.app
+// components/cart/CartSummary.tsx
+
 "use client";
 
 import { useState } from "react";
@@ -17,26 +20,27 @@ import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/context/CartContext";
 import { Loader2 } from "lucide-react";
 
+// Updated global type for the modern, class-based PaystackPop
 declare global {
   interface Window {
-    PaystackPop?: {
-      setup: (config: PaystackConfig) => {
-        openIframe: () => void;
-      };
+    PaystackPop?: new (config: PaystackConfig) => {
+      open: () => void;
+      close: () => void;
     };
   }
 }
 
+// Updated interface to make subaccount mandatory
 interface PaystackConfig {
   key: string;
   email: string;
   amount: number;
   currency: string;
   ref: string;
-  subaccount?: string;
-  metadata?: {
+  subaccount: string;
+  metadata: {
     orderId: string;
-    subaccount?: string;
+    subaccount: string;
     [key: string]: any;
   };
   callback: (response: any) => void;
@@ -71,7 +75,7 @@ export function CartSummary() {
       const poll = setInterval(async () => {
         attempts++;
         try {
-          const res = await fetch(`/api/orders/status/${orderId}`);
+          const res = await fetch(`/api/orders/${orderId}`);
           if (res.ok) {
             const data = await res.json();
             if (data.status === "Completed") {
@@ -92,6 +96,7 @@ export function CartSummary() {
   };
 
   const handlePayment = async () => {
+    // --- Step 1: Initial Validation ---
     if (!session?.user || !session.user.email) {
       toast.error("Please sign in to proceed to checkout.");
       router.push("/api/auth/signin?callbackUrl=/cart");
@@ -101,23 +106,23 @@ export function CartSummary() {
       toast.error("Your cart is empty.");
       return;
     }
-    if (typeof window === "undefined" || !window.PaystackPop) {
-      toast.error("Payment system is not available. Please refresh the page.");
-      return;
-    }
 
-    // Validate required environment variables
+    // --- Step 2: Validate Environment Configuration ---
     const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
-    if (!paystackPublicKey) {
-      console.error("Missing NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY");
+    const subaccountCode = process.env.NEXT_PUBLIC_TEDBOOKS_SUBACCOUNT_CODE;
+
+    if (!paystackPublicKey || !subaccountCode) {
+      console.error("FATAL: Missing Paystack public key or subaccount code.");
       toast.error("Payment configuration error. Please contact support.");
       return;
     }
 
+    // --- Step 3: Start the Order Process ---
     setProcessingState("creating_order");
     const loadingToast = toast.loading("Preparing your order...");
 
     try {
+      // Create the order on the backend first
       const orderPayload = {
         items: cartItems.map((item) => ({
           bookId: item._id,
@@ -131,29 +136,36 @@ export function CartSummary() {
         body: JSON.stringify(orderPayload),
       });
 
-      if (!res.ok) throw new Error("Could not create an order.");
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Could not create an order.");
+      }
 
       const newPendingOrder = await res.json();
       const orderId = newPendingOrder._id;
       const orderReference = newPendingOrder.customId;
 
-      // Validate order data
       if (!orderId || !orderReference) {
-        throw new Error("Invalid order data received");
+        throw new Error("Invalid order data received from server.");
       }
 
       toast.dismiss(loadingToast);
       setProcessingState("awaiting_payment");
 
-      // Build the Paystack configuration
+      // --- Step 4: Build Paystack Configuration ---
       const paystackConfig: PaystackConfig = {
         key: paystackPublicKey,
         email: session.user.email,
-        amount: Math.round(totalPrice * 100), // Convert to kobo/cents
+        amount: Math.round(totalPrice * 100), // Convert to kobo
         currency: "KES",
         ref: orderReference,
+        subaccount: subaccountCode,
+        metadata: {
+          orderId: orderId,
+          subaccount: subaccountCode,
+          customer_name: session.user.name || "Valued Customer",
+        },
         callback: async (response) => {
-          // Payment was successful on the client, now verify on the server.
           setProcessingState("verifying");
           const verificationToast = toast.loading(
             "Payment received. Verifying order..."
@@ -171,12 +183,11 @@ export function CartSummary() {
               description:
                 "We've received your payment and will confirm your order shortly. You can check its status in your dashboard.",
             });
-            clearCart(); // Clear cart as payment was made
-            router.push("/account"); // Redirect to order history
+            clearCart();
+            router.push("/account");
           }
         },
         onClose: () => {
-          // Only set back to idle if we were not in the verification stage
           if (processingState === "awaiting_payment") {
             toast.info("Payment was cancelled.");
             setProcessingState("idle");
@@ -184,47 +195,26 @@ export function CartSummary() {
         },
       };
 
-      // Add subaccount and metadata only if subaccount is configured
-      const subaccountCode = process.env.NEXT_PUBLIC_TEDBOOKS_SUBACCOUNT_CODE;
-      if (subaccountCode) {
-        paystackConfig.subaccount = subaccountCode;
-        paystackConfig.metadata = {
-          orderId: orderId,
-          subaccount: subaccountCode,
-          customer_name: session.user.name || "Valued Customer",
-        };
-      } else {
-        // Basic metadata without subaccount
-        paystackConfig.metadata = {
-          orderId: orderId,
-          customer_name: session.user.name || "Valued Customer",
-        };
-      }
-
-      // Validate final configuration
-      if (
-        !paystackConfig.key ||
-        !paystackConfig.email ||
-        !paystackConfig.amount ||
-        !paystackConfig.ref
-      ) {
-        throw new Error("Invalid payment configuration");
-      }
-
-      console.log("Paystack config:", {
-        key: paystackConfig.key ? "✓ Present" : "✗ Missing",
+      console.log("Paystack config being used:", {
+        key: "✓ Present",
         email: paystackConfig.email,
         amount: paystackConfig.amount,
         currency: paystackConfig.currency,
         ref: paystackConfig.ref,
-        subaccount: paystackConfig.subaccount ? "✓ Present" : "Not configured",
+        subaccount: "✓ Present",
+        metadata: paystackConfig.metadata,
       });
 
-      const paystackHandler = window.PaystackPop.setup(paystackConfig);
-      paystackHandler.openIframe();
+      // --- Step 5: Initialize and Open Paystack Popup ---
+      if (typeof window === "undefined" || !window.PaystackPop) {
+        throw new Error("Payment system failed to load. Please refresh.");
+      }
+
+      const paystackHandler = new window.PaystackPop(paystackConfig);
+      paystackHandler.open();
     } catch (error: any) {
       console.error("Checkout error:", error);
-      toast.dismiss();
+      toast.dismiss(); // Dismiss any loading toasts
       toast.error("Checkout Failed", {
         description: error.message || "An unexpected error occurred",
       });
