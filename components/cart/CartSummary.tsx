@@ -20,17 +20,18 @@ import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/context/CartContext";
 import { Loader2 } from "lucide-react";
 
-// Updated global type for the modern, class-based PaystackPop
+// Updated global type for Paystack v2
 declare global {
   interface Window {
-    PaystackPop?: new (config: PaystackConfig) => {
-      open: () => void;
-      close: () => void;
+    PaystackPop?: {
+      setup: (config: PaystackConfig) => {
+        openIframe: () => void;
+      };
     };
   }
 }
 
-// Updated interface to make subaccount mandatory
+// Updated interface for Paystack v2
 interface PaystackConfig {
   key: string;
   email: string;
@@ -43,8 +44,10 @@ interface PaystackConfig {
     subaccount: string;
     [key: string]: any;
   };
-  callback: (response: any) => void;
-  onClose: () => void;
+  onSuccess: (transaction: any) => void;
+  onLoad: (response: any) => void;
+  onCancel: () => void;
+  onError: (error: any) => void;
 }
 
 // Enum for processing states for clearer logic
@@ -117,7 +120,13 @@ export function CartSummary() {
       return;
     }
 
-    // --- Step 3: Start the Order Process ---
+    // --- Step 3: Check if Paystack is loaded ---
+    if (typeof window === "undefined" || !window.PaystackPop) {
+      toast.error("Payment system is still loading. Please try again in a moment.");
+      return;
+    }
+
+    // --- Step 4: Start the Order Process ---
     setProcessingState("creating_order");
     const loadingToast = toast.loading("Preparing your order...");
 
@@ -152,11 +161,11 @@ export function CartSummary() {
       toast.dismiss(loadingToast);
       setProcessingState("awaiting_payment");
 
-      // --- Step 4: Build Paystack Configuration ---
+      // --- Step 5: Build Paystack v2 Configuration ---
       const paystackConfig: PaystackConfig = {
         key: paystackPublicKey,
         email: session.user.email,
-        amount: Math.round(totalPrice * 100), // Convert to kobo
+        amount: Math.round(totalPrice * 100), // Convert to kobo/cents
         currency: "KES",
         ref: orderReference,
         subaccount: subaccountCode,
@@ -165,7 +174,8 @@ export function CartSummary() {
           subaccount: subaccountCode,
           customer_name: session.user.name || "Valued Customer",
         },
-        callback: async (response) => {
+        onSuccess: async (transaction) => {
+          console.log("Payment successful:", transaction);
           setProcessingState("verifying");
           const verificationToast = toast.loading(
             "Payment received. Verifying order..."
@@ -187,11 +197,20 @@ export function CartSummary() {
             router.push("/account");
           }
         },
-        onClose: () => {
+        onLoad: (response) => {
+          console.log("Paystack loaded:", response);
+        },
+        onCancel: () => {
+          console.log("Payment cancelled by user");
           if (processingState === "awaiting_payment") {
             toast.info("Payment was cancelled.");
             setProcessingState("idle");
           }
+        },
+        onError: (error) => {
+          console.error("Payment error:", error);
+          toast.error("Payment failed. Please try again.");
+          setProcessingState("idle");
         },
       };
 
@@ -205,13 +224,10 @@ export function CartSummary() {
         metadata: paystackConfig.metadata,
       });
 
-      // --- Step 5: Initialize and Open Paystack Popup ---
-      if (typeof window === "undefined" || !window.PaystackPop) {
-        throw new Error("Payment system failed to load. Please refresh.");
-      }
+      // --- Step 6: Initialize and Open Paystack v2 Popup ---
+      const paystackHandler = window.PaystackPop.setup(paystackConfig);
+      paystackHandler.openIframe();
 
-      const paystackHandler = new window.PaystackPop(paystackConfig);
-      paystackHandler.open();
     } catch (error: any) {
       console.error("Checkout error:", error);
       toast.dismiss(); // Dismiss any loading toasts
