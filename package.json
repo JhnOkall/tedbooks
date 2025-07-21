@@ -11,6 +11,7 @@
   "dependencies": {
     "@auth/mongodb-adapter": "^3.9.1",
     "@google/generative-ai": "^0.24.1",
+    "@paystack/inline-js": "^2.22.7",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-checkbox": "^1.3.2",
@@ -43,6 +44,7 @@
     "@tailwindcss/postcss": "^4",
     "@tailwindcss/typography": "^0.5.16",
     "@types/node": "^20",
+    "@types/paystack__inline-js": "^1.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

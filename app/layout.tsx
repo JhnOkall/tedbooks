@@ -124,12 +124,6 @@ export default function RootLayout({
           root layout into a client component.
         */}
         <Providers>{children}</Providers>
-
-        {/* Paystack script, loaded lazily for better performance */}
-        <Script
-          src="https://js.paystack.co/v2/inline.js"
-          strategy="lazyOnload"
-        />
       </body>
     </html>
   );
