@@ -18,11 +18,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CheckCircle, Download, Loader2, ShoppingBag } from "lucide-react";
+import {
+  CheckCircle,
+  Download,
+  Loader2, // Import the loader icon
+  ShoppingBag,
+} from "lucide-react";
 import type { Order, OrderItem } from "@/types";
 import { useCart } from "@/context/CartContext";
 import { Separator } from "@/components/ui/separator";
-import { toast } from "sonner";
+import { toast } from "sonner"; // Import toast for user feedback
 
 /**
  * Renders the content for the order success/confirmation page.
@@ -37,9 +42,6 @@ export function OrderSuccessContent() {
 
   const paymentRef = searchParams.get("ref");
 
-  /**
-   * Effect hook to fetch the order details from the API when the component mounts.
-   */
   useEffect(() => {
     if (!paymentRef) {
       setOrder(null);
@@ -81,6 +83,7 @@ export function OrderSuccessContent() {
       const res = await fetch(`/api/download`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // Ensure both orderId and bookId are sent
         body: JSON.stringify({ orderId: order._id, bookId: bookId }),
       });
 
@@ -92,7 +95,6 @@ export function OrderSuccessContent() {
       const { url } = await res.json();
 
       // Open the signed URL in a new tab to initiate the download.
-      // Using window.open is often better for this than window.location.href.
       window.open(url, "_blank");
 
       toast.dismiss(loadingToast);
@@ -129,8 +131,7 @@ export function OrderSuccessContent() {
     );
   }
 
-  // NOTE: We no longer need to filter by `downloadUrl` on the client, as the server
-  // will handle the logic of whether a book is downloadable.
+  // Use all items from the order for the download list. The API will be the source of truth for availability.
   const downloadableItems = order.items;
 
   // Render the successful order confirmation view
@@ -174,10 +175,10 @@ export function OrderSuccessContent() {
                       </div>
                     </div>
 
-                    {/* --- SECURE DOWNLOAD BUTTON --- */}
+                    {/* --- THE CORRECTED SECURE DOWNLOAD BUTTON --- */}
                     <Button
                       size="sm"
-                      className="rounded-lg w-[120px]" // Set a fixed width to prevent layout shift
+                      className="rounded-lg w-[120px]" // Fixed width to prevent layout shift
                       onClick={() => handleDownload(item.bookId, item.title)}
                       disabled={downloading === item.bookId}
                     >

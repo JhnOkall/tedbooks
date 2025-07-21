@@ -29,7 +29,7 @@ import type { Order, OrderItem, UserProfile } from "@/types";
 import { User, Package, Download, Phone, Loader2 } from "lucide-react";
 import Link from "next/link";
 
-// --- Child Component: ProfileSection --- (No changes needed)
+// --- Child Component: ProfileSection --- (No changes)
 function ProfileSection({ profile }: { profile: UserProfile | null }) {
   if (!profile) {
     return (
@@ -51,7 +51,6 @@ function ProfileSection({ profile }: { profile: UserProfile | null }) {
       </Card>
     );
   }
-
   return (
     <Card className="shadow-lg rounded-lg">
       <CardHeader className="flex flex-row items-center space-x-4 pb-4">
@@ -83,7 +82,7 @@ function ProfileSection({ profile }: { profile: UserProfile | null }) {
   );
 }
 
-// --- Child Component: OrderCard --- (No changes needed)
+// --- Child Component: OrderCard --- (No changes)
 function OrderCard({ order }: { order: Order }) {
   return (
     <Card className="shadow-md rounded-lg overflow-hidden">
@@ -140,10 +139,9 @@ function OrderCard({ order }: { order: Order }) {
   );
 }
 
-// --- Child Component: OrdersSection --- (No changes needed)
+// --- Child Component: OrdersSection --- (No changes)
 function OrdersSection({ orders }: { orders: Order[] | null }) {
   if (!orders) return null;
-
   return (
     <div className="space-y-6">
       {orders.length > 0 ? (
@@ -157,7 +155,7 @@ function OrdersSection({ orders }: { orders: Order[] | null }) {
   );
 }
 
-// --- Child Component: DownloadsSection --- (UPDATED)
+// --- Child Component: DownloadsSection --- (THIS SECTION IS FULLY REWRITTEN)
 
 /**
  * A helper type to represent a downloadable item with its parent order ID.
@@ -173,7 +171,8 @@ function DownloadsSection({ orders }: { orders: Order[] | null }) {
 
   if (!orders) return null;
 
-  // Flatten all items from completed orders, adding the parent order's ID to each item.
+  // **THE FIX**: We flatten all items from completed orders and importantly, we use .map()
+  // to add the parent order's ID (`parentOrderId`) to each item object.
   const downloadableItems: DownloadableItem[] =
     orders
       .filter((order) => order.status === "Completed")
@@ -182,10 +181,11 @@ function DownloadsSection({ orders }: { orders: Order[] | null }) {
       ) || [];
 
   /**
-   * Handles the secure download process.
+   * Handles the secure download process. It now receives the full item object
+   * which contains both the bookId and the newly added parentOrderId.
    */
   const handleDownload = async (item: DownloadableItem) => {
-    if (downloading) return;
+    if (downloading) return; // Prevent multiple clicks while one is in progress
 
     setDownloading(item.bookId);
     const loadingToast = toast.loading(
@@ -193,6 +193,7 @@ function DownloadsSection({ orders }: { orders: Order[] | null }) {
     );
 
     try {
+      // **THE FIX**: The request body now correctly includes both required IDs.
       const res = await fetch(`/api/download`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -216,7 +217,7 @@ function DownloadsSection({ orders }: { orders: Order[] | null }) {
       toast.dismiss(loadingToast);
       toast.error("Download Failed", { description: error.message });
     } finally {
-      setDownloading(null);
+      setDownloading(null); // Reset the loading state
     }
   };
 
@@ -233,7 +234,7 @@ function DownloadsSection({ orders }: { orders: Order[] | null }) {
           <ul className="space-y-4">
             {downloadableItems.map((item) => (
               <li
-                key={`${item.parentOrderId}-${item.bookId}`} // Create a more unique key
+                key={`${item.parentOrderId}-${item.bookId}`} // A more robust unique key
                 className="flex items-center justify-between p-3 border rounded-lg shadow-sm"
               >
                 <div className="flex items-center space-x-3">
@@ -252,7 +253,7 @@ function DownloadsSection({ orders }: { orders: Order[] | null }) {
                   </div>
                 </div>
 
-                {/* Secure Download Button */}
+                {/* **THE FIX**: The onClick handler now passes the entire `item` object. */}
                 <Button
                   size="sm"
                   className="rounded-lg w-[120px]"
@@ -281,7 +282,7 @@ function DownloadsSection({ orders }: { orders: Order[] | null }) {
   );
 }
 
-// --- Main Page Component --- (No changes needed)
+// --- Main Page Component --- (No changes)
 export default function AccountPage() {
   const { status } = useSession();
   const router = useRouter();
