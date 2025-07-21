@@ -1,7 +1,7 @@
 /**
- * @file Defines the `OrderSuccessContent` component, which is responsible for displaying the
- * order confirmation page. This client component fetches order details based on an ID from
- * the URL, clears the user's cart, and provides download links for purchased items.
+ * @file Defines the `OrderSuccessContent` component for the order confirmation page.
+ * This component fetches order details, clears the cart, and provides secure, server-generated
+ * download links for purchased digital items.
  */
 
 "use client";
@@ -18,10 +18,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CheckCircle, Download, ShoppingBag } from "lucide-react";
+import { CheckCircle, Download, Loader2, ShoppingBag } from "lucide-react";
 import type { Order, OrderItem } from "@/types";
 import { useCart } from "@/context/CartContext";
 import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
 
 /**
  * Renders the content for the order success/confirmation page.
@@ -30,22 +31,16 @@ import { Separator } from "@/components/ui/separator";
 export function OrderSuccessContent() {
   const searchParams = useSearchParams();
   const { clearCart } = useCart();
-  /**
-   * State to hold the order details. It uses a three-state approach:
-   * - `undefined`: Initial loading state before the fetch completes.
-   * - `null`: State indicating an error or that the order was not found.
-   * - `Order`: State indicating a successful fetch with order data.
-   */
   const [order, setOrder] = useState<Order | null | undefined>(undefined);
+  // State to track the download progress for a specific book ID.
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   const paymentRef = searchParams.get("ref");
 
   /**
-   * Effect hook to fetch the order details from the API when the component mounts
-   * or when the `paymentRef` in the URL changes.
+   * Effect hook to fetch the order details from the API when the component mounts.
    */
   useEffect(() => {
-    // If there is no paymentRef in the URL, we can immediately determine the order is not found.
     if (!paymentRef) {
       setOrder(null);
       return;
@@ -54,37 +49,68 @@ export function OrderSuccessContent() {
     const fetchOrderDetails = async () => {
       try {
         const res = await fetch(`/api/orders/by-ref/${paymentRef}`);
-
-        // If the API responds with a non-2xx status code (e.g., 404, 403),
-        // we treat it as an error and assume the order cannot be displayed.
         if (!res.ok) {
           throw new Error("Order not found or access denied.");
         }
-
         const data: Order = await res.json();
         setOrder(data);
-
-        // Crucial Side Effect: Clear the user's shopping cart only after
-        // we have successfully confirmed and loaded their new order.
         clearCart();
       } catch (error) {
-        // TODO: Implement a robust logging service (e.g., Sentry) to capture production errors.
         console.error("Failed to fetch order:", error);
-        setOrder(null); // Transition to the "not found" state on any fetch failure.
+        setOrder(null);
       }
     };
 
     fetchOrderDetails();
   }, [paymentRef, clearCart]);
 
-  // Render a loading state while the order data is being fetched.
+  /**
+   * Handles the secure download process for a purchased item.
+   * @param bookId The ID of the book to download.
+   * @param bookTitle The title of the book, used for user feedback.
+   */
+  const handleDownload = async (bookId: string, bookTitle: string) => {
+    if (downloading || !order) return; // Prevent multiple clicks or clicks before order loads
+
+    setDownloading(bookId);
+    const loadingToast = toast.loading(
+      `Preparing download for "${bookTitle}"...`
+    );
+
+    try {
+      const res = await fetch(`/api/download`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order._id, bookId: bookId }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Could not get download link.");
+      }
+
+      const { url } = await res.json();
+
+      // Open the signed URL in a new tab to initiate the download.
+      // Using window.open is often better for this than window.location.href.
+      window.open(url, "_blank");
+
+      toast.dismiss(loadingToast);
+      toast.success("Your download is starting!");
+    } catch (error: any) {
+      toast.dismiss(loadingToast);
+      toast.error("Download Failed", { description: error.message });
+    } finally {
+      setDownloading(null); // Reset the loading state
+    }
+  };
+
+  // Render loading state
   if (order === undefined) {
-    // This state is typically handled by a <Suspense> boundary in Next.js,
-    // but this provides a fallback.
     return <p className="text-center py-20">Loading order details...</p>;
   }
 
-  // Render an error/not-found state if the order could not be loaded.
+  // Render error/not-found state
   if (!order) {
     return (
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-16 text-center">
@@ -95,7 +121,6 @@ export function OrderSuccessContent() {
             We couldn't find the details for this order. It might be invalid, or
             you may not have permission to view it.
           </p>
-          {/* TODO: Centralize application routes like '/shop' into a constants file. */}
           <Button asChild size="lg" className="rounded-lg shadow-md">
             <Link href="/shop">Continue Shopping</Link>
           </Button>
@@ -104,10 +129,11 @@ export function OrderSuccessContent() {
     );
   }
 
-  // Filter for items that have a download URL to render the downloads section.
-  const downloadableItems = order.items.filter((item) => item.downloadUrl);
+  // NOTE: We no longer need to filter by `downloadUrl` on the client, as the server
+  // will handle the logic of whether a book is downloadable.
+  const downloadableItems = order.items;
 
-  // Render the successful order confirmation view.
+  // Render the successful order confirmation view
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-16">
       <Card className="max-w-2xl mx-auto rounded-lg shadow-lg text-center">
@@ -123,7 +149,6 @@ export function OrderSuccessContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 px-6 md:px-10">
-          {/* Renders a list of purchased items with their download links. */}
           {downloadableItems.length > 0 && (
             <div>
               <h3 className="text-xl font-semibold mb-4">Your Downloads</h3>
@@ -148,18 +173,22 @@ export function OrderSuccessContent() {
                         </p>
                       </div>
                     </div>
-                    {/* TODO: Implement secure, time-limited download URLs. Storing and serving
-                    static URLs is a security risk for digital products. The backend should
-                    generate a temporary, signed URL upon request. */}
-                    <Button asChild size="sm" className="rounded-lg">
-                      <Link
-                        href={item.downloadUrl || "#"}
-                        download
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Download className="mr-2 h-4 w-4" /> Download
-                      </Link>
+
+                    {/* --- SECURE DOWNLOAD BUTTON --- */}
+                    <Button
+                      size="sm"
+                      className="rounded-lg w-[120px]" // Set a fixed width to prevent layout shift
+                      onClick={() => handleDownload(item.bookId, item.title)}
+                      disabled={downloading === item.bookId}
+                    >
+                      {downloading === item.bookId ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Download className="mr-2 h-4 w-4" />
+                          Download
+                        </>
+                      )}
                     </Button>
                   </li>
                 ))}

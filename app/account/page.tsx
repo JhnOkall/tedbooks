@@ -23,21 +23,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner"; // Import toast for user feedback
 
 import type { Order, OrderItem, UserProfile } from "@/types";
 import { User, Package, Download, Phone, Loader2 } from "lucide-react";
 import Link from "next/link";
 
-// --- Child Component: ProfileSection ---
-
-/**
- * Displays the user's profile information.
- * Shows a skeleton loader while the profile data is being fetched.
- * @param {object} props - The component props.
- * @param {UserProfile | null} props.profile - The user's profile data.
- */
+// --- Child Component: ProfileSection --- (No changes needed)
 function ProfileSection({ profile }: { profile: UserProfile | null }) {
-  // Renders a skeleton loader if profile data is not yet available.
   if (!profile) {
     return (
       <Card className="shadow-lg rounded-lg">
@@ -80,11 +73,8 @@ function ProfileSection({ profile }: { profile: UserProfile | null }) {
           <Phone className="mr-2 h-4 w-4 text-muted-foreground" />
           <span>Phone: {profile.phone || "Not Provided"}</span>
         </div>
-        {/* TODO: Add an address section here if user addresses are added to the User model and API. */}
       </CardContent>
       <CardFooter>
-        {/* TODO: Implement the profile editing functionality. This will require a new page or modal
-        and a corresponding PATCH endpoint for updating user details. */}
         <Button variant="outline" className="rounded-lg" disabled>
           Edit Profile
         </Button>
@@ -93,13 +83,7 @@ function ProfileSection({ profile }: { profile: UserProfile | null }) {
   );
 }
 
-// --- Child Component: OrderCard ---
-
-/**
- * Renders a summary card for a single order.
- * @param {object} props - The component props.
- * @param {Order} props.order - The order data to display.
- */
+// --- Child Component: OrderCard --- (No changes needed)
 function OrderCard({ order }: { order: Order }) {
   return (
     <Card className="shadow-md rounded-lg overflow-hidden">
@@ -114,12 +98,9 @@ function OrderCard({ order }: { order: Order }) {
             </CardDescription>
           </div>
           <div className="text-right">
-            {/* TODO: The currency 'Ksh.' is hardcoded. Refactor to use a centralized
-            currency formatting utility (e.g., `Intl.NumberFormat`) to support internationalization. */}
             <p className="font-semibold text-lg text-primary">
               Ksh. {order.totalAmount.toFixed(2)}
             </p>
-            {/* Dynamically styles the status badge based on the order status. */}
             <span
               className={`text-xs px-2 py-1 rounded-full font-medium ${
                 order.status === "Completed"
@@ -159,15 +140,9 @@ function OrderCard({ order }: { order: Order }) {
   );
 }
 
-// --- Child Component: OrdersSection ---
-
-/**
- * Renders a list of a user's past orders.
- * @param {object} props - The component props.
- * @param {Order[] | null} props.orders - An array of the user's orders.
- */
+// --- Child Component: OrdersSection --- (No changes needed)
 function OrdersSection({ orders }: { orders: Order[] | null }) {
-  if (!orders) return null; // Or a loading state if passed separately
+  if (!orders) return null;
 
   return (
     <div className="space-y-6">
@@ -182,26 +157,68 @@ function OrdersSection({ orders }: { orders: Order[] | null }) {
   );
 }
 
-// --- Child Component: DownloadsSection ---
+// --- Child Component: DownloadsSection --- (UPDATED)
+
+/**
+ * A helper type to represent a downloadable item with its parent order ID.
+ */
+type DownloadableItem = OrderItem & { parentOrderId: string };
 
 /**
  * Renders a list of all downloadable items from the user's completed orders.
- * @param {object} props - The component props.
- * @param {Order[] | null} props.orders - An array of the user's orders.
+ * Implements a secure download mechanism by fetching a signed URL from the server.
  */
 function DownloadsSection({ orders }: { orders: Order[] | null }) {
+  const [downloading, setDownloading] = useState<string | null>(null);
+
   if (!orders) return null;
 
-  // Filters all orders to find completed ones, then flattens the items
-  // and filters for those that have a valid `downloadUrl`.
-  const downloadableItems: OrderItem[] =
+  // Flatten all items from completed orders, adding the parent order's ID to each item.
+  const downloadableItems: DownloadableItem[] =
     orders
       .filter((order) => order.status === "Completed")
-      .flatMap((order) => order.items)
-      .filter(
-        (item): item is OrderItem & { downloadUrl: string } =>
-          !!item.downloadUrl
+      .flatMap((order) =>
+        order.items.map((item) => ({ ...item, parentOrderId: order._id }))
       ) || [];
+
+  /**
+   * Handles the secure download process.
+   */
+  const handleDownload = async (item: DownloadableItem) => {
+    if (downloading) return;
+
+    setDownloading(item.bookId);
+    const loadingToast = toast.loading(
+      `Preparing download for "${item.title}"...`
+    );
+
+    try {
+      const res = await fetch(`/api/download`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: item.parentOrderId,
+          bookId: item.bookId,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Could not get download link.");
+      }
+
+      const { url } = await res.json();
+      window.open(url, "_blank");
+
+      toast.dismiss(loadingToast);
+      toast.success("Your download is starting!");
+    } catch (error: any) {
+      toast.dismiss(loadingToast);
+      toast.error("Download Failed", { description: error.message });
+    } finally {
+      setDownloading(null);
+    }
+  };
 
   return (
     <Card className="shadow-lg rounded-lg">
@@ -216,7 +233,7 @@ function DownloadsSection({ orders }: { orders: Order[] | null }) {
           <ul className="space-y-4">
             {downloadableItems.map((item) => (
               <li
-                key={item._id}
+                key={`${item.parentOrderId}-${item.bookId}`} // Create a more unique key
                 className="flex items-center justify-between p-3 border rounded-lg shadow-sm"
               >
                 <div className="flex items-center space-x-3">
@@ -234,19 +251,22 @@ function DownloadsSection({ orders }: { orders: Order[] | null }) {
                     </p>
                   </div>
                 </div>
-                {/* TODO: [Security] Implement a secure download mechanism. Storing and linking to static
-                `downloadUrl`s is a security risk. A better approach is to create a new API endpoint
-                (e.g., `/api/downloads/[orderItemId]`) that verifies ownership and generates a
-                secure, time-limited, pre-signed URL for the asset on-demand. */}
-                <Button asChild size="sm" className="rounded-lg">
-                  <Link
-                    href={item.downloadUrl}
-                    download
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Download className="mr-2 h-4 w-4" /> Download
-                  </Link>
+
+                {/* Secure Download Button */}
+                <Button
+                  size="sm"
+                  className="rounded-lg w-[120px]"
+                  onClick={() => handleDownload(item)}
+                  disabled={downloading === item.bookId}
+                >
+                  {downloading === item.bookId ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-4 w-4" />
+                      Download
+                    </>
+                  )}
                 </Button>
               </li>
             ))}
@@ -261,12 +281,7 @@ function DownloadsSection({ orders }: { orders: Order[] | null }) {
   );
 }
 
-// --- Main Page Component ---
-
-/**
- * The main component for the user account page. It orchestrates data fetching
- * and displays the profile, orders, and downloads in a tabbed interface.
- */
+// --- Main Page Component --- (No changes needed)
 export default function AccountPage() {
   const { status } = useSession();
   const router = useRouter();
@@ -275,12 +290,7 @@ export default function AccountPage() {
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  /**
-   * Effect hook to fetch all necessary account data when the user's
-   * authentication status is confirmed.
-   */
   useEffect(() => {
-    // A client-side safeguard, though middleware should primarily handle this.
     if (status === "unauthenticated") {
       router.push("/api/auth/signin?callbackUrl=/account");
       return;
@@ -290,7 +300,6 @@ export default function AccountPage() {
       const fetchData = async () => {
         setIsLoading(true);
         try {
-          // Fetches profile and order data in parallel for better performance.
           const [profileRes, ordersRes] = await Promise.all([
             fetch("/api/users/me"),
             fetch("/api/orders"),
@@ -298,8 +307,6 @@ export default function AccountPage() {
 
           if (profileRes.ok) setProfile(await profileRes.json());
           if (ordersRes.ok) setOrders(await ordersRes.json());
-          // TODO: Add more specific error handling for non-ok responses to provide
-          // better user feedback, e.g., showing a toast notification.
         } catch (error) {
           console.error("Failed to fetch account data:", error);
         } finally {
@@ -310,7 +317,6 @@ export default function AccountPage() {
     }
   }, [status, router]);
 
-  // Shows a page-level loader while waiting for the session or initial data.
   if (status === "loading" || isLoading) {
     return (
       <MainLayout>

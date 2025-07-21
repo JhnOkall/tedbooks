@@ -31,6 +31,8 @@ export interface IBook extends Document {
    */
   price: number;
 
+  filePublicId: string;
+
   /**
    * A short description or summary, suitable for display in list or card views.
    */
@@ -98,6 +100,7 @@ const BookSchema: Schema<IBook> = new Schema(
       required: [true, 'Price is required.'],
       min: [0, 'Price cannot be negative.'],
     },
+    filePublicId: { type: String, required: true },
     description: {
       type: String,
       required: [true, 'Description is required.'],
