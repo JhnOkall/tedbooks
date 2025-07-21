@@ -1,4 +1,3 @@
-// components/cart/CartSummary.tsx
 /**
  * @file This file defines the `CartSummary` component. It uses the @paystack/inline-js
  * NPM package for a reliable, asynchronous, webhook-driven "payment-first" flow.
@@ -78,9 +77,6 @@ export function CartSummary() {
       currency: "KES",
       reference: uniqueRef,
       subaccountCode: tedbooksSubaccount,
-      // --- THE FIX IS HERE ---
-      // We cast the metadata object to `any` to bypass the strict type definition.
-      // This allows us to send our custom data structure, which the Paystack API accepts.
       metadata: {
         userId: session.user.id!,
         cartItems: cartItems.map((item: CartItem) => ({

@@ -9,10 +9,48 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useCart } from "@/context/CartContext";
 import { CartItemCard } from "@/components/cart/CartItemCard";
-import { CartSummary } from "@/components/cart/CartSummary";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Loader2, ShoppingBag } from "lucide-react";
+
+// --- DYNAMIC IMPORT SECTION ---
+import dynamic from "next/dynamic";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Dynamically import CartSummary and disable server-side rendering for it.
+const CartSummary = dynamic(
+  () => import("@/components/cart/CartSummary").then((mod) => mod.CartSummary),
+  {
+    ssr: false, // This is the crucial part that prevents the "window is not defined" error
+    loading: () => <CartSummarySkeleton />,
+  }
+);
+
+// A simple skeleton component to prevent layout shift while CartSummary loads.
+const CartSummarySkeleton = () => (
+  <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
+    <div className="flex flex-col space-y-1.5 p-6">
+      <h3 className="text-2xl font-semibold leading-none tracking-tight">
+        Order Summary
+      </h3>
+    </div>
+    <div className="p-6 pt-0 space-y-4">
+      <div className="flex justify-between items-center">
+        <Skeleton className="h-5 w-32" />
+        <Skeleton className="h-5 w-24" />
+      </div>
+      <Skeleton className="h-px w-full" />
+      <div className="flex justify-between items-center text-xl font-bold">
+        <Skeleton className="h-6 w-16" />
+        <Skeleton className="h-6 w-28" />
+      </div>
+    </div>
+    <div className="flex items-center p-6 pt-0">
+      <Skeleton className="h-12 w-full rounded-lg" />
+    </div>
+  </div>
+);
+// --- END DYNAMIC IMPORT SECTION ---
 
 /**
  * The main component for the `/cart` route. It orchestrates the display of
@@ -85,6 +123,7 @@ export default function CartPage() {
             </div>
             {/* The right column contains the order summary and checkout functionality. */}
             <div className="lg:col-span-1">
+              {/* This now renders the dynamically loaded CartSummary component */}
               <CartSummary />
             </div>
           </div>
