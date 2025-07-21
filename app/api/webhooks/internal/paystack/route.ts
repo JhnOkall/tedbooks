@@ -1,9 +1,11 @@
+// app\api\webhooks\internal\paystack\route.ts
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import crypto from 'crypto';
 import connectDB from '@/lib/db';
 import Order from '@/models/Order';
 import Book from '@/models/Book';
+import { IOrderItem } from '@/models/Order'; // Import the sub-document type for clarity
 
 /**
  * Internal webhook handler specifically for TedBooks.
@@ -20,9 +22,8 @@ export async function POST(req: Request) {
   const requestBody = await req.text();
   const signature = (await headers()).get('x-internal-signature');
 
-  // Step 1: Verify the incoming request is from our trusted central router
+  // Step 1: Verify the incoming request
   const expectedSignature = crypto.createHmac('sha256', internalSecret).update(requestBody).digest('hex');
-
   if (expectedSignature !== signature) {
     console.warn('Invalid internal webhook signature received for TedBooks.');
     return NextResponse.json({ message: 'Invalid signature' }, { status: 401 });
@@ -30,45 +31,61 @@ export async function POST(req: Request) {
 
   const event = JSON.parse(requestBody);
 
-  // Step 2: Process only the successful charge event to create an order
+  // Step 2: Process only the successful charge event
   if (event.event === 'charge.success') {
     try {
       await connectDB();
 
-      const { reference, metadata, amount, customer, paid_at, id: transactionId } = event.data;
+      const { reference, metadata, amount, paid_at, id: transactionId } = event.data;
 
-      // Idempotency Check: Prevent creating duplicate orders from webhook retries
-      const existingOrder = await Order.findOne({ customId: reference });
+      // Idempotency Check
+      const existingOrder = await Order.findOne({ 'paymentDetails.transactionId': transactionId });
       if (existingOrder) {
-        console.log(`Order with reference ${reference} already exists. Acknowledging event.`);
+        console.log(`Order with transactionId ${transactionId} already exists. Acknowledging event.`);
         return NextResponse.json({ status: 'ok', message: 'Order already processed.' });
       }
 
-      const orderItems = metadata.cartItems;
-      let totalAmount = 0;
+      const cartItemsFromClient = metadata.cartItems;
+      let totalAmountCalculated = 0;
+      const orderItems: IOrderItem[] = [];
 
-      // Recalculate total on the backend for security
-      for (const item of orderItems) {
+      // **MODIFIED BLOCK: Fetch book details to build the rich order items array**
+      // This is the crucial change for data integrity and schema alignment.
+      for (const item of cartItemsFromClient) {
         const book = await Book.findById(item.bookId);
-        if (book) {
-          totalAmount += book.price * item.quantity;
+        if (!book) {
+          // If a book is not found, we should fail the entire transaction
+          console.error(`Book with ID ${item.bookId} not found for order ref ${reference}.`);
+          return NextResponse.json({ message: "Invalid item in cart." }, { status: 400 });
         }
+
+        orderItems.push({
+          book: book._id,
+          title: book.title,
+          author: book.author,
+          quantity: item.quantity,
+          priceAtPurchase: book.price,
+          coverImage: book.coverImage,
+          downloadUrl: book.fileUrl, 
+        });
+
+        totalAmountCalculated += book.price * item.quantity;
       }
 
       // Security check: ensure amount paid matches calculated total
-      if (Math.round(totalAmount * 100) !== amount) {
-          console.error(`Amount mismatch for ref ${reference}. Paystack: ${amount}, Calculated: ${Math.round(totalAmount * 100)}`);
+      if (Math.round(totalAmountCalculated * 100) !== amount) {
+          console.error(`Amount mismatch for ref ${reference}. Paystack: ${amount}, Calculated: ${Math.round(totalAmountCalculated * 100)}`);
           return NextResponse.json({ message: "Price mismatch detected." }, { status: 400 });
       }
       
-      // Create the order
+      // **MODIFIED BLOCK: Create the order using the new, correct structure**
       await Order.create({
         user: metadata.userId,
-        items: orderItems,
-        totalAmount: totalAmount,
-        status: 'Paid',
+        items: orderItems, // Use the rich array we just built
+        totalAmount: totalAmountCalculated,
+        status: 'Completed', // Use a valid status from the schema enum
         customId: reference,
-        paymentDetails: {
+        paymentDetails: { // Use the new structured paymentDetails object
           method: "Paystack",
           transactionId: transactionId,
           status: "Success",
@@ -80,11 +97,9 @@ export async function POST(req: Request) {
 
     } catch (error: any) {
       console.error('[TEDBOOKS_WEBHOOK_ERROR]', error);
-      // Return a 500 so the central router knows something went wrong
       return NextResponse.json({ message: "Error processing webhook", error: error.message }, { status: 500 });
     }
   }
 
-  // Step 3: Acknowledge receipt of the event
   return NextResponse.json({ status: 'ok' });
 }
