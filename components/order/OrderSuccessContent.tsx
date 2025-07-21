@@ -38,22 +38,22 @@ export function OrderSuccessContent() {
    */
   const [order, setOrder] = useState<Order | null | undefined>(undefined);
 
-  const orderId = searchParams.get("orderId");
+  const paymentRef = searchParams.get("ref");
 
   /**
    * Effect hook to fetch the order details from the API when the component mounts
-   * or when the `orderId` in the URL changes.
+   * or when the `paymentRef` in the URL changes.
    */
   useEffect(() => {
-    // If there is no orderId in the URL, we can immediately determine the order is not found.
-    if (!orderId) {
+    // If there is no paymentRef in the URL, we can immediately determine the order is not found.
+    if (!paymentRef) {
       setOrder(null);
       return;
     }
 
     const fetchOrderDetails = async () => {
       try {
-        const res = await fetch(`/api/orders/${orderId}`);
+        const res = await fetch(`/api/orders/by-ref/${paymentRef}`);
 
         // If the API responds with a non-2xx status code (e.g., 404, 403),
         // we treat it as an error and assume the order cannot be displayed.
@@ -75,7 +75,7 @@ export function OrderSuccessContent() {
     };
 
     fetchOrderDetails();
-  }, [orderId, clearCart]);
+  }, [paymentRef, clearCart]);
 
   // Render a loading state while the order data is being fetched.
   if (order === undefined) {
