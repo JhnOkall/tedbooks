@@ -109,8 +109,9 @@ export interface OrderItem {
 
   /**
    * The ID of the book purchased. References the 'Book' collection.
+   * This property name matches the backend model.
    */
-  bookId: string;
+  book: string; // FIX: Changed from bookId to book
 
   /**
    * The title of the book at the time of purchase.

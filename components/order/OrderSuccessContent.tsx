@@ -175,14 +175,14 @@ export function OrderSuccessContent() {
                       </div>
                     </div>
 
-                    {/* --- THE CORRECTED SECURE DOWNLOAD BUTTON --- */}
+                    {/* --- FIX: Use item.book instead of item.bookId --- */}
                     <Button
                       size="sm"
                       className="rounded-lg w-[120px]" // Fixed width to prevent layout shift
-                      onClick={() => handleDownload(item.bookId, item.title)}
-                      disabled={downloading === item.bookId}
+                      onClick={() => handleDownload(item.book, item.title)}
+                      disabled={downloading === item.book}
                     >
-                      {downloading === item.bookId ? (
+                      {downloading === item.book ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <>
