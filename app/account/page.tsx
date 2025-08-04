@@ -187,7 +187,7 @@ function DownloadsSection({ orders }: { orders: Order[] | null }) {
   const handleDownload = async (item: DownloadableItem) => {
     if (downloading) return; // Prevent multiple clicks while one is in progress
 
-    setDownloading(item.bookId);
+    setDownloading(item.book);
     const loadingToast = toast.loading(
       `Preparing download for "${item.title}"...`
     );
@@ -199,7 +199,7 @@ function DownloadsSection({ orders }: { orders: Order[] | null }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderId: item.parentOrderId,
-          bookId: item.bookId,
+          bookId: item.book,
         }),
       });
 
@@ -234,7 +234,7 @@ function DownloadsSection({ orders }: { orders: Order[] | null }) {
           <ul className="space-y-4">
             {downloadableItems.map((item) => (
               <li
-                key={`${item.parentOrderId}-${item.bookId}`} // A more robust unique key
+                key={`${item.parentOrderId}-${item.book}`} // A more robust unique key
                 className="flex items-center justify-between p-3 border rounded-lg shadow-sm"
               >
                 <div className="flex items-center space-x-3">
@@ -258,9 +258,9 @@ function DownloadsSection({ orders }: { orders: Order[] | null }) {
                   size="sm"
                   className="rounded-lg w-[120px]"
                   onClick={() => handleDownload(item)}
-                  disabled={downloading === item.bookId}
+                  disabled={downloading === item.book}
                 >
-                  {downloading === item.bookId ? (
+                  {downloading === item.book ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <>
