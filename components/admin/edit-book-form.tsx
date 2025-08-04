@@ -18,7 +18,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-// === MODIFICATION: Added Sparkles icon ===
 import { Save, Ban, Loader2, AlertCircle, Sparkles } from "lucide-react";
 import { FileUpload } from "./file-upload";
 
@@ -33,9 +32,8 @@ export function EditBookForm({ book }: EditBookFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The formData state will now correctly hold and update the filePublicId
   const [formData, setFormData] = useState<Partial<IBook>>(book);
-
-  // === NEW: State for AI generation ===
   const [isGenerating, setIsGenerating] = useState(false);
 
   const handleInputChange = (
@@ -45,7 +43,6 @@ export function EditBookForm({ book }: EditBookFormProps) {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // === NEW: Handler for AI generation ===
   const handleGenerateDescription = async () => {
     if (!formData.title || !formData.author) {
       toast.error("Title and Author must be present to generate content.");
@@ -72,7 +69,6 @@ export function EditBookForm({ book }: EditBookFormProps) {
 
       const data = await res.json();
 
-      // Update form state with the generated content
       setFormData((prev) => ({
         ...prev,
         description: data.description || "",
@@ -99,6 +95,7 @@ export function EditBookForm({ book }: EditBookFormProps) {
       const res = await fetch(`/api/books/${book._id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
+        // The entire formData, including the potentially updated filePublicId, is sent
         body: JSON.stringify(formData),
       });
 
@@ -130,6 +127,7 @@ export function EditBookForm({ book }: EditBookFormProps) {
           </Alert>
         )}
 
+        {/* --- No changes needed in this section --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
@@ -139,7 +137,7 @@ export function EditBookForm({ book }: EditBookFormProps) {
               value={formData.title || ""}
               onChange={handleInputChange}
               required
-              disabled={isSubmitting || isGenerating} // === MODIFICATION ===
+              disabled={isSubmitting || isGenerating}
             />
           </div>
           <div className="space-y-2">
@@ -150,7 +148,7 @@ export function EditBookForm({ book }: EditBookFormProps) {
               value={formData.author || ""}
               onChange={handleInputChange}
               required
-              disabled={isSubmitting || isGenerating} // === MODIFICATION ===
+              disabled={isSubmitting || isGenerating}
             />
           </div>
         </div>
@@ -217,13 +215,14 @@ export function EditBookForm({ book }: EditBookFormProps) {
             acceptedFileTypes="image/*"
             helpText="Upload a new file to replace the current one."
             initialUrl={formData.coverImage}
-            onUploadComplete={(url) =>
-              setFormData((prev) => ({ ...prev, coverImage: url }))
+            // === MODIFICATION: Handle the result object from onUploadComplete ===
+            onUploadComplete={(result) =>
+              setFormData((prev) => ({ ...prev, coverImage: result.url }))
             }
             onRemove={() =>
               setFormData((prev) => ({ ...prev, coverImage: book.coverImage }))
             }
-            disabled={isSubmitting || isGenerating} // === MODIFICATION ===
+            disabled={isSubmitting || isGenerating}
           />
           <FileUpload
             label="Book File"
@@ -231,17 +230,29 @@ export function EditBookForm({ book }: EditBookFormProps) {
             acceptedFileTypes=".pdf,.epub"
             helpText="Upload a new file to replace the current one."
             initialUrl={formData.fileUrl}
-            initialFileName={formData.fileUrl?.split("/").pop()}
-            onUploadComplete={(url) =>
-              setFormData((prev) => ({ ...prev, fileUrl: url }))
+            // === MODIFICATION: Use the stable filePublicId as the initial file name ===
+            initialFileName={book.filePublicId}
+            // === MODIFICATION: Update both fileUrl AND filePublicId on new upload ===
+            onUploadComplete={(result) =>
+              setFormData((prev) => ({
+                ...prev,
+                fileUrl: result.url,
+                filePublicId: result.publicId,
+              }))
             }
+            // === MODIFICATION: Revert both fileUrl AND filePublicId on removal ===
             onRemove={() =>
-              setFormData((prev) => ({ ...prev, fileUrl: book.fileUrl }))
+              setFormData((prev) => ({
+                ...prev,
+                fileUrl: book.fileUrl,
+                filePublicId: book.filePublicId,
+              }))
             }
-            disabled={isSubmitting || isGenerating} // === MODIFICATION ===
+            disabled={isSubmitting || isGenerating}
           />
         </div>
 
+        {/* --- No changes needed in this section --- */}
         <div className="flex items-center space-x-2 pt-2">
           <Checkbox
             id="featured"
@@ -249,7 +260,7 @@ export function EditBookForm({ book }: EditBookFormProps) {
             onCheckedChange={(checked) =>
               setFormData((prev) => ({ ...prev, featured: !!checked }))
             }
-            disabled={isSubmitting || isGenerating} // === MODIFICATION ===
+            disabled={isSubmitting || isGenerating}
           />
           <Label htmlFor="featured" className="font-normal cursor-pointer">
             Mark as Featured Book
@@ -265,7 +276,7 @@ export function EditBookForm({ book }: EditBookFormProps) {
         <Button
           type="submit"
           className="rounded-lg shadow-md"
-          disabled={isSubmitting || isGenerating} // === MODIFICATION ===
+          disabled={isSubmitting || isGenerating}
         >
           {isSubmitting ? (
             <>

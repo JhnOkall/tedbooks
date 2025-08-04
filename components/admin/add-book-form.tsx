@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, FormEvent, ChangeEvent } from "react"; // === MODIFICATION ===
+import { useState, FormEvent, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Save, Loader2, AlertCircle, Sparkles } from "lucide-react"; // === MODIFICATION ===
+import { Save, Loader2, AlertCircle, Sparkles } from "lucide-react";
 import { FileUpload } from "./file-upload";
 
 /**
@@ -26,11 +26,8 @@ export function AddBookForm() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // === MODIFICATION: State for AI generation ===
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // === MODIFICATION: State for controlled form inputs ===
   const [formData, setFormData] = useState({
     title: "",
     author: "",
@@ -41,11 +38,11 @@ export function AddBookForm() {
     featured: false,
   });
 
-  // State now only needs to hold the final URLs
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const [bookFileUrl, setBookFileUrl] = useState<string | null>(null);
+  // === MODIFICATION: Add state for the file's public ID ===
+  const [filePublicId, setFilePublicId] = useState<string | null>(null);
 
-  // === MODIFICATION: Handler for controlled inputs ===
   const handleInputChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -53,7 +50,6 @@ export function AddBookForm() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // === NEW FUNCTION: Handler for AI generation ===
   const handleGenerateDescription = async () => {
     if (!formData.title || !formData.author) {
       toast.error("Please enter a Title and Author first.");
@@ -80,7 +76,6 @@ export function AddBookForm() {
 
       const data = await res.json();
 
-      // Update form state with the generated content
       setFormData((prev) => ({
         ...prev,
         description: data.description || "",
@@ -107,19 +102,21 @@ export function AddBookForm() {
       setIsSubmitting(false);
       return;
     }
-    if (!bookFileUrl) {
+    // === MODIFICATION: Check for both book file URL and public ID ===
+    if (!bookFileUrl || !filePublicId) {
       setError("Please upload a book file first.");
       setIsSubmitting(false);
       return;
     }
 
     try {
-      // === MODIFICATION: Use formData state instead of FormData API ===
       const bookData = {
         ...formData,
         price: Number(formData.price),
         coverImage: coverImageUrl,
         fileUrl: bookFileUrl,
+        // === MODIFICATION: Include the filePublicId in the request body ===
+        filePublicId: filePublicId,
       };
 
       toast.loading("Saving book details...");
@@ -131,7 +128,13 @@ export function AddBookForm() {
 
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.message || "Failed to save the book.");
+        // Use the detailed validation error if available
+        const validationMessage = errorData.errors
+          ? Object.values(errorData.errors)
+              .map((e: any) => e.message)
+              .join(" ")
+          : errorData.message;
+        throw new Error(validationMessage || "Failed to save the book.");
       }
 
       toast.dismiss();
@@ -166,7 +169,7 @@ export function AddBookForm() {
               required
               disabled={isSubmitting || isGenerating}
               value={formData.title}
-              onChange={handleInputChange} // === MODIFICATION ===
+              onChange={handleInputChange}
             />
           </div>
           <div className="space-y-2">
@@ -178,12 +181,11 @@ export function AddBookForm() {
               required
               disabled={isSubmitting || isGenerating}
               value={formData.author}
-              onChange={handleInputChange} // === MODIFICATION ===
+              onChange={handleInputChange}
             />
           </div>
         </div>
 
-        {/* === NEW: AI Generation Button === */}
         <div className="flex justify-start">
           <Button
             type="button"
@@ -269,22 +271,30 @@ export function AddBookForm() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* === MODIFICATION: Update how onUploadComplete is handled === */}
           <FileUpload
             label="Cover Image"
             uploadType="image"
             acceptedFileTypes="image/*"
             helpText="PNG, JPG, WEBP (max 10MB)"
-            onUploadComplete={(url) => setCoverImageUrl(url)}
+            onUploadComplete={(result) => setCoverImageUrl(result.url)}
             onRemove={() => setCoverImageUrl(null)}
             disabled={isSubmitting}
           />
+          {/* === MODIFICATION: Update onUploadComplete and onRemove for the book file === */}
           <FileUpload
             label="Book File"
             uploadType="file"
             acceptedFileTypes=".pdf,.epub"
             helpText="PDF, EPUB (max 10MB)"
-            onUploadComplete={(url) => setBookFileUrl(url)}
-            onRemove={() => setBookFileUrl(null)}
+            onUploadComplete={(result) => {
+              setBookFileUrl(result.url);
+              setFilePublicId(result.publicId);
+            }}
+            onRemove={() => {
+              setBookFileUrl(null);
+              setFilePublicId(null);
+            }}
             disabled={isSubmitting}
           />
         </div>
@@ -305,11 +315,16 @@ export function AddBookForm() {
         </div>
       </CardContent>
       <CardFooter className="flex justify-end pt-4">
+        {/* === MODIFICATION: Add filePublicId to the disabled check === */}
         <Button
           type="submit"
           className="rounded-lg shadow-md"
           disabled={
-            isSubmitting || isGenerating || !coverImageUrl || !bookFileUrl
+            isSubmitting ||
+            isGenerating ||
+            !coverImageUrl ||
+            !bookFileUrl ||
+            !filePublicId
           }
         >
           {isSubmitting ? (

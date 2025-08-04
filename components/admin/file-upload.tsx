@@ -20,35 +20,29 @@ import {
 import { Button } from "@/components/ui/button";
 import { uploadFileWithProgress } from "@/lib/upload-utils";
 
-// Props for our reusable component
+// MODIFICATION: Update the onUploadComplete prop signature
 interface FileUploadProps {
   label: string;
   uploadType: "image" | "file";
   acceptedFileTypes: string;
   helpText: string;
-  onUploadComplete: (url: string) => void;
+  onUploadComplete: (result: { url: string; publicId: string }) => void;
   onRemove: () => void;
   disabled?: boolean;
   initialUrl?: string | null;
   initialFileName?: string;
-  maxSizeMb?: number; // <-- NEW: To enforce a file size limit, defaults to 10MB
+  maxSizeMb?: number;
 }
 
 interface UploadState {
   file: File | null;
-  // This can be an object URL for new images, or the initial URL for existing ones
   previewUrl: string | null;
-  // This is for displaying file names (e.g., "my-book.pdf")
   previewName: string | null;
   isUploading: boolean;
   isUploaded: boolean;
   progress: number;
 }
 
-/**
- * A reusable client component for handling file uploads with previews and progress.
- * Can display an initial file/image for edit forms and enforce a file size limit.
- */
 export function FileUpload({
   label,
   uploadType,
@@ -59,7 +53,7 @@ export function FileUpload({
   disabled = false,
   initialUrl = null,
   initialFileName = "File",
-  maxSizeMb = 10, // <-- NEW: Default max size set to 10MB
+  maxSizeMb = 10,
 }: FileUploadProps) {
   const [uploadState, setUploadState] = useState<UploadState>({
     file: null,
@@ -72,7 +66,6 @@ export function FileUpload({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Effect to update state if the initialUrl prop changes from the parent
   useEffect(() => {
     setUploadState((prev) => ({
       ...prev,
@@ -106,7 +99,8 @@ export function FileUpload({
       });
 
       try {
-        const uploadedUrl = await uploadFileWithProgress(
+        // MODIFICATION: Capture the result object
+        const uploadResult = await uploadFileWithProgress(
           file,
           uploadType,
           (progress) => {
@@ -118,14 +112,14 @@ export function FileUpload({
           ...prev,
           isUploading: false,
           isUploaded: true,
-          previewUrl: uploadedUrl, // Update preview to the final URL
+          previewUrl: uploadResult.url, // Update preview to the final URL
         }));
 
-        onUploadComplete(uploadedUrl);
+        // MODIFICATION: Pass the entire result object to the parent
+        onUploadComplete(uploadResult);
         toast.success(`${label} uploaded successfully!`);
       } catch (error: any) {
         setUploadState({
-          // Revert on failure
           file: null,
           previewUrl: initialUrl,
           previewName: initialFileName,
@@ -142,7 +136,6 @@ export function FileUpload({
   );
 
   const removeFile = () => {
-    // If we were displaying a new image preview, revoke its object URL
     if (
       uploadState.file &&
       uploadType === "image" &&
@@ -151,7 +144,6 @@ export function FileUpload({
       URL.revokeObjectURL(uploadState.previewUrl);
     }
 
-    // Reset state back to the initial props
     setUploadState({
       file: null,
       previewUrl: initialUrl,
@@ -163,7 +155,7 @@ export function FileUpload({
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-    onRemove(); // Notify parent that the change was reverted
+    onRemove();
   };
 
   const Icon = uploadType === "image" ? ImageIcon : FileText;
@@ -182,12 +174,10 @@ export function FileUpload({
             <p className="text-sm text-gray-600 mb-2">
               Click to upload {label.toLowerCase()}
             </p>
-            {/* UPDATED: Help text now shows the max size */}
             <p className="text-xs text-gray-400">{helpText}</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {/* Preview Section */}
             {uploadType === "image" ? (
               <div className="relative">
                 <Image
@@ -230,7 +220,6 @@ export function FileUpload({
               </div>
             )}
 
-            {/* Upload Status Section */}
             {uploadState.isUploading && (
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
@@ -268,11 +257,9 @@ export function FileUpload({
           const file = e.target.files?.[0];
           if (!file) return;
 
-          // <-- NEW: Enforce file size limit before handling the file
           const MAX_FILE_SIZE_BYTES = maxSizeMb * 1024 * 1024;
           if (file.size > MAX_FILE_SIZE_BYTES) {
             toast.error(`File size cannot exceed ${maxSizeMb}MB.`);
-            // Reset the input so the user can select another file
             if (fileInputRef.current) {
               fileInputRef.current.value = "";
             }

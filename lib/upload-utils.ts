@@ -30,13 +30,13 @@ function slugify(text: string): string {
  * @param file The file to upload.
  * @param uploadType The type of upload ('image' or 'file') to determine Cloudinary settings.
  * @param onProgress A callback function to report upload progress (0-100).
- * @returns A promise that resolves to the secure URL of the uploaded file.
+ * @returns A promise that resolves to an object with the secure URL and public ID of the uploaded file.
  */
 export const uploadFileWithProgress = async (
   file: File,
   uploadType: 'image' | 'file',
   onProgress: (progress: number) => void
-): Promise<string> => {
+): Promise<{ url: string; publicId: string }> => { // MODIFICATION: Changed return type
   onProgress(0);
 
   // === Step 1: Prepare upload parameters and get a signature from our API ===
@@ -105,7 +105,8 @@ export const uploadFileWithProgress = async (
       if (xhr.status === 200) {
         onProgress(100);
         const response = JSON.parse(xhr.responseText);
-        resolve(response.secure_url);
+        // MODIFICATION: Resolve with an object containing both URL and public_id
+        resolve({ url: response.secure_url, publicId: response.public_id });
       } else {
         const errorResponse = JSON.parse(xhr.responseText);
         console.error("Cloudinary upload error:", errorResponse);
