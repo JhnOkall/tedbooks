@@ -94,8 +94,16 @@ export function OrderSuccessContent() {
 
       const { url } = await res.json();
 
-      // Open the signed URL in a new tab to initiate the download.
-      window.open(url, "_blank");
+      // Create a temporary anchor element to trigger the download
+      // without opening a new tab.
+      const link = document.createElement("a");
+      link.href = url;
+      // The 'download' attribute is not strictly necessary if the server
+      // sends the correct 'Content-Disposition' header, but it's a good fallback.
+      link.setAttribute("download", "");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link); // Clean up the DOM
 
       toast.dismiss(loadingToast);
       toast.success("Your download is starting!");
@@ -175,7 +183,6 @@ export function OrderSuccessContent() {
                       </div>
                     </div>
 
-                    {/* --- FIX: Use item.book instead of item.bookId --- */}
                     <Button
                       size="sm"
                       className="rounded-lg w-[120px]" // Fixed width to prevent layout shift
