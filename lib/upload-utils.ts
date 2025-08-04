@@ -1,5 +1,3 @@
-// lib/utils.ts
-
 /**
  * @file This file contains utility functions for file uploads to Cloudinary using a signed upload flow.
  */
@@ -42,16 +40,20 @@ export const uploadFileWithProgress = async (
   onProgress(0);
 
   // === Step 1: Prepare upload parameters and get a signature from our API ===
-  const fileExtension = file.name.split('.').pop() || '';
+  const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
   const originalFilenameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
   
   const folder = uploadType === 'image' ? 'book-covers' : 'book-files';
   const resource_type = uploadType === 'image' ? 'image' : 'raw';
 
-  // Create a unique, clean public_id. This is the value we want to return.
-  const public_id = uploadType === 'image' 
+  // Create a unique base name for the public_id.
+  const publicIdBase = uploadType === 'image' 
     ? nanoid() 
     : slugify(originalFilenameWithoutExt);
+
+  // MODIFICATION: Append the file extension to the public_id.
+  // This makes the public_id more descriptive (e.g., 'random-id.jpg' or 'my-book-title.pdf').
+  const public_id = fileExtension ? `${publicIdBase}.${fileExtension}` : publicIdBase;
     
   let signatureResponse;
   try {
@@ -105,8 +107,7 @@ export const uploadFileWithProgress = async (
         onProgress(100);
         const response = JSON.parse(xhr.responseText);
 
-        // === THE FIX IS HERE ===
-        // The `public_id` variable from Step 1 already holds the clean ID we want.
+        // The `public_id` variable from Step 1 already holds the clean ID we want (now with extension).
         // We ignore `response.public_id` which contains the folder path.
         // We only need the secure_url from the response.
         resolve({ url: response.secure_url, publicId: public_id });
