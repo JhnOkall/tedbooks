@@ -59,12 +59,17 @@ export async function POST(req: NextRequest) {
     }
 
     // 6. Generate secure, time-limited download URL
-    const signedUrl = cloudinary.utils.private_download_url(book.filePublicId, 'pdf', {
-        resource_type: 'raw', // Correctly specify the resource type for PDFs
-        type: 'upload',
-        expires_at: Math.floor(Date.now() / 1000) + 300,
-        attachment: true,
-    });
+    const signedUrl = cloudinary.utils.private_download_url(
+  `book-files/${book.filePublicId}`,
+  'pdf',
+  {
+    resource_type: 'raw',
+    type: 'upload',
+    expires_at: Math.floor(Date.now() / 1000) + 300,
+    attachment: true,
+  }
+);
+
 
     // 7. Return the signed URL to the frontend
     return NextResponse.json({ url: signedUrl });
