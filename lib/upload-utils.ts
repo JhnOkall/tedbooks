@@ -1,3 +1,5 @@
+// lib/utils.ts
+
 /**
  * @file This file contains utility functions for file uploads to Cloudinary using a signed upload flow.
  */
@@ -30,13 +32,13 @@ function slugify(text: string): string {
  * @param file The file to upload.
  * @param uploadType The type of upload ('image' or 'file') to determine Cloudinary settings.
  * @param onProgress A callback function to report upload progress (0-100).
- * @returns A promise that resolves to an object with the secure URL and public ID of the uploaded file.
+ * @returns A promise that resolves to an object with the secure URL and the clean public ID.
  */
 export const uploadFileWithProgress = async (
   file: File,
   uploadType: 'image' | 'file',
   onProgress: (progress: number) => void
-): Promise<{ url: string; publicId: string }> => { // MODIFICATION: Changed return type
+): Promise<{ url: string; publicId: string }> => {
   onProgress(0);
 
   // === Step 1: Prepare upload parameters and get a signature from our API ===
@@ -44,9 +46,9 @@ export const uploadFileWithProgress = async (
   const originalFilenameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
   
   const folder = uploadType === 'image' ? 'book-covers' : 'book-files';
-  const resource_type = uploadType === 'image' ? 'image' : 'raw'; // 'raw' is for non-image files like PDF/EPUB
+  const resource_type = uploadType === 'image' ? 'image' : 'raw';
 
-  // Create a unique public_id. For books, we use a slug; for images, a random ID.
+  // Create a unique, clean public_id. This is the value we want to return.
   const public_id = uploadType === 'image' 
     ? nanoid() 
     : slugify(originalFilenameWithoutExt);
@@ -68,7 +70,7 @@ export const uploadFileWithProgress = async (
     throw new Error('Could not prepare the file for upload. Please try again.');
   }
   
-  onProgress(10); // Indicate that signing is complete
+  onProgress(10); 
 
   // === Step 2: Upload the file directly to Cloudinary using the signature ===
   const { signature, timestamp, api_key, cloud_name, resource_type: returnedResourceType, signed_params } = signatureResponse;
@@ -82,7 +84,6 @@ export const uploadFileWithProgress = async (
   formData.append('folder', folder);
   formData.append('public_id', public_id);
   
-  // Only append parameters that were included in the signature
   if (signed_params?.use_filename) {
     formData.append('use_filename', 'true');
   }
@@ -91,11 +92,9 @@ export const uploadFileWithProgress = async (
     const xhr = new XMLHttpRequest();
     xhr.open('POST', url, true);
 
-    // Monitor upload progress
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
         const progress = Math.round((event.loaded / event.total) * 100);
-        // We scale progress from 10% to 100% to account for the signing step
         onProgress(10 + (progress * 0.9));
       }
     };
@@ -105,8 +104,13 @@ export const uploadFileWithProgress = async (
       if (xhr.status === 200) {
         onProgress(100);
         const response = JSON.parse(xhr.responseText);
-        // MODIFICATION: Resolve with an object containing both URL and public_id
-        resolve({ url: response.secure_url, publicId: response.public_id });
+
+        // === THE FIX IS HERE ===
+        // The `public_id` variable from Step 1 already holds the clean ID we want.
+        // We ignore `response.public_id` which contains the folder path.
+        // We only need the secure_url from the response.
+        resolve({ url: response.secure_url, publicId: public_id });
+
       } else {
         const errorResponse = JSON.parse(xhr.responseText);
         console.error("Cloudinary upload error:", errorResponse);
@@ -114,7 +118,6 @@ export const uploadFileWithProgress = async (
       }
     };
 
-    // Handle errors
     xhr.onerror = () => {
       reject(new Error('An network error occurred during the upload.'));
     };
