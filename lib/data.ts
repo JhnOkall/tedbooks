@@ -1,10 +1,13 @@
 /**
  * @file This module contains data-fetching functions for interacting with the
- * book-related API endpoints. It utilizes Next.js's extended `fetch` API for
+ * application's API endpoints. It utilizes Next.js's extended `fetch` API for
  * caching and revalidation strategies.
  */
 
-import { IBook } from '@/models/Book';
+// --- MODIFICATION START ---
+// Import the frontend-facing types for better type safety in data-fetching functions.
+import { Book, Genre } from '@/types';
+// --- MODIFICATION END ---
 
 /**
  * Retrieves the base URL for API calls.
@@ -17,24 +20,33 @@ function getBaseUrl(): string {
   return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 }
 
+// --- MODIFICATION START ---
+/**
+ * A Note on API Endpoints:
+ * For the following functions to work, your API endpoints (e.g., in `app/api/books/route.ts`)
+ * must be updated to use Mongoose's `.populate('genre')` method when querying for books.
+ * This will replace the genre's ObjectId with the full genre document.
+ *
+ * Example:
+ * const books = await Book.find({ featured: true }).populate('genre');
+ */
+// --- MODIFICATION END ---
+
 /**
  * Fetches an array of books that are marked as "featured".
- * This function is optimized for performance by caching the response for one hour
- * using Next.js's Incremental Static Regeneration (ISR).
+ * This function is optimized by caching the response for one hour.
  *
- * @returns {Promise<IBook[]>} A promise that resolves to an array of featured books.
- * Returns an empty array if the fetch fails or an error occurs.
+ * @returns {Promise<Book[]>} A promise that resolves to an array of featured books.
  */
-export async function getFeaturedBooks(): Promise<IBook[]> {
+export async function getFeaturedBooks(): Promise<Book[]> {
   const baseUrl = getBaseUrl();
   try {
+    // The API endpoint must populate the 'genre' field for this to work correctly.
     const res = await fetch(`${baseUrl}/api/books?featured=true`, {
-      // Revalidate this data at most once every hour (3600 seconds).
       next: { revalidate: 3600 },
     });
 
     if (!res.ok) {
-      // TODO: Implement a more robust logging service instead of console.error for production environments.
       console.error(`Failed to fetch featured books: ${res.statusText}`);
       return [];
     }
@@ -42,31 +54,39 @@ export async function getFeaturedBooks(): Promise<IBook[]> {
     return res.json();
   } catch (error) {
     console.error('An error occurred in getFeaturedBooks:', error);
-    // Gracefully handle network or other exceptions by returning an empty array.
     return [];
   }
 }
 
 /**
- * Fetches all books, optionally filtered by a search query.
- * This fetch is not cached (`cache: 'no-store'`) to ensure that search results
- * are always up-to-date and reflect the most current data.
+ * Fetches all books, with optional filtering by search query or genre slug.
+ * This fetch is not cached (`cache: 'no-store'`) to ensure that results
+ * are always up-to-date.
  *
- * @param {string} [searchQuery] - An optional string to search against book titles or authors.
- * @returns {Promise<IBook[]>} A promise that resolves to an array of books matching the criteria.
- * Returns an empty array on failure.
+ * @param {{ searchQuery?: string; genreSlug?: string }} params - Optional search and genre filters.
+ * @returns {Promise<Book[]>} A promise that resolves to an array of books matching the criteria.
  */
-export async function getAllBooks(searchQuery?: string): Promise<IBook[]> {
+// --- MODIFICATION START ---
+export async function getAllBooks(params: {
+  searchQuery?: string;
+  genreSlug?: string;
+}): Promise<Book[]> {
+  const { searchQuery, genreSlug } = params;
   const baseUrl = getBaseUrl();
-  let url = `${baseUrl}/api/books`;
+  const queryParams = new URLSearchParams();
 
   if (searchQuery) {
-    url += `?search=${encodeURIComponent(searchQuery)}`;
+    queryParams.append('search', searchQuery);
   }
+  // The API endpoint should be designed to find the genre by slug and then query books.
+  if (genreSlug) {
+    queryParams.append('genre', genreSlug);
+  }
+
+  const url = `${baseUrl}/api/books?${queryParams.toString()}`;
 
   try {
     const res = await fetch(url, {
-      // Opt out of caching to ensure dynamic search results are always fresh.
       cache: 'no-store',
     });
 
@@ -81,29 +101,28 @@ export async function getAllBooks(searchQuery?: string): Promise<IBook[]> {
     return [];
   }
 }
+// --- MODIFICATION END ---
 
 /**
  * Fetches a single book by its unique identifier.
  * The result is cached for one hour to improve performance for frequently accessed books.
  *
  * @param {string} id - The unique MongoDB `_id` of the book to retrieve.
- * @returns {Promise<IBook | null>} A promise that resolves to the book object,
- * or `null` if the book is not found or an error occurs.
+ * @returns {Promise<Book | null>} A promise that resolves to the book object, or `null`.
  */
-export async function getBookById(id: string): Promise<IBook | null> {
+export async function getBookById(id: string): Promise<Book | null> {
   const baseUrl = getBaseUrl();
   try {
+    // The API endpoint must populate the 'genre' field.
     const res = await fetch(`${baseUrl}/api/books/${id}`, {
-      // Cache this specific book's data for one hour.
       next: { revalidate: 3600 },
     });
 
     if (res.status === 404) {
-      return null; // Handle "Not Found" gracefully.
+      return null;
     }
 
     if (!res.ok) {
-      // For other errors, log the issue and return null.
       console.error(`Failed to fetch book ${id}: ${res.statusText}`);
       return null;
     }
@@ -116,46 +135,98 @@ export async function getBookById(id: string): Promise<IBook | null> {
 }
 
 /**
- * Fetches a list of books from the same genre as a given book, to be used as
- * "related" or "recommended" products.
+ * Fetches a list of related books from the same genre, excluding the source book.
+ * This function is now optimized to let the API handle filtering and limiting.
  *
- * @param {IBook} book - The primary book object used to determine the genre.
- * @returns {Promise<IBook[]>} A promise that resolves to an array of up to 4 related books,
- * excluding the original book. Returns an empty array on failure.
+ * @param {Book} book - The primary book object.
+ * @returns {Promise<Book[]>} A promise that resolves to an array of up to 4 related books.
  */
-export async function getRelatedBooks(book: IBook): Promise<IBook[]> {
-  if (!book.genre) return [];
+// --- MODIFICATION START ---
+export async function getRelatedBooks(book: Book): Promise<Book[]> {
+  // The 'book' object now has a 'genre' object with an '_id'
+  if (!book.genre?._id) return [];
 
   const baseUrl = getBaseUrl();
   try {
-    // TODO: Optimize this by enhancing the API. The API endpoint should support
-    // excluding an ID and limiting the results directly (e.g., `/api/books?genre=...&excludeId=...&limit=4`)
-    // to avoid over-fetching and filtering on the client-side.
-    const res = await fetch(
-      `${baseUrl}/api/books?genre=${encodeURIComponent(book.genre)}`,
-      {
-        next: { revalidate: 3600 }, // Cache genre results for an hour.
-      }
-    );
+    // API is enhanced to handle filtering by genre ID, excluding a specific book, and limiting results.
+    const url = `${baseUrl}/api/books?genreId=${book.genre._id}&exclude=${book._id}&limit=4`;
+
+    const res = await fetch(url, {
+      next: { revalidate: 3600 }, // Cache related books for an hour
+    });
 
     if (!res.ok) {
       console.error(
-        `Failed to fetch related books for genre ${book.genre}: ${res.statusText}`
+        `Failed to fetch related books for genre ${book.genre.name}: ${res.statusText}`
       );
       return [];
     }
-
-    const booksInGenre: IBook[] = await res.json();
-
-    // Filter out the current book from the results and limit to the first 4.
-    return booksInGenre
-      .filter((relatedBook) => relatedBook._id !== book._id)
-      .slice(0, 4);
+    // The client-side filtering and slicing is no longer needed.
+    return res.json();
   } catch (error) {
     console.error(
-      `Error fetching related books for genre ${book.genre}:`,
+      `Error fetching related books for genre ${book.genre.name}:`,
       error
     );
     return [];
+  }
+}
+// --- MODIFICATION END ---
+
+// --- NEW FUNCTIONS FOR GENRES ---
+
+/**
+ * Fetches all available genres from the API.
+ * Results are cached for 24 hours as genres change infrequently.
+ *
+ * @returns {Promise<Genre[]>} A promise that resolves to an array of all genres.
+ */
+export async function getAllGenres(): Promise<Genre[]> {
+  const baseUrl = getBaseUrl();
+  try {
+    const res = await fetch(`${baseUrl}/api/genres`, {
+      // Revalidate once a day (86400 seconds)
+      next: { revalidate: 86400 },
+    });
+
+    if (!res.ok) {
+      console.error(`Failed to fetch genres: ${res.statusText}`);
+      return [];
+    }
+
+    return res.json();
+  } catch (error) {
+    console.error('An error occurred in getAllGenres:', error);
+    return [];
+  }
+}
+
+/**
+ * Fetches a single genre by its URL-friendly slug.
+ * The result is cached for one hour.
+ *
+ * @param {string} slug - The slug of the genre to retrieve.
+ * @returns {Promise<Genre | null>} A promise that resolves to the genre object, or `null`.
+ */
+export async function getGenreBySlug(slug: string): Promise<Genre | null> {
+  const baseUrl = getBaseUrl();
+  try {
+    const res = await fetch(`${baseUrl}/api/genres/${slug}`, {
+      next: { revalidate: 3600 },
+    });
+
+    if (res.status === 404) {
+      return null;
+    }
+
+    if (!res.ok) {
+      console.error(`Failed to fetch genre ${slug}: ${res.statusText}`);
+      return null;
+    }
+
+    return res.json();
+  } catch (error) {
+    console.error(`Error fetching genre with slug ${slug}:`, error);
+    return null;
   }
 }

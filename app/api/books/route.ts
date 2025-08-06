@@ -5,15 +5,16 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import Book from '@/models/Book';
+import Book, { IBook } from '@/models/Book';
+import Genre from '@/models/Genre'; // --- MODIFICATION: Import Genre model ---
 import { auth } from '@/auth';
 import connectDB from '@/lib/db';
 import { FilterQuery } from 'mongoose';
-import { IBook } from '@/models/Book';
 
 /**
  * Handles GET requests to fetch books from the database.
- * Supports filtering by genre, featured status, and a text search on title and author.
+ * Supports filtering by genre (slug or ID), featured status, exclusion of a specific ID,
+ * limiting results, and a text search on title and author.
  *
  * @param {NextRequest} request - The incoming HTTP request object.
  * @returns {Promise<NextResponse>} A promise that resolves to the API response containing the list of books.
@@ -24,36 +25,64 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
-    const genre = searchParams.get('genre');
+    const genreSlug = searchParams.get('genre'); // This is the genre slug
+    const genreId = searchParams.get('genreId'); // This is the genre _id
     const featured = searchParams.get('featured');
+    const excludeId = searchParams.get('exclude');
+    const limit = searchParams.get('limit');
 
-    // Build the MongoDB query object dynamically based on the provided search parameters.
     const query: FilterQuery<IBook> = {};
 
     if (search) {
-      // Create a case-insensitive regex search across both the title and author fields.
       query.$or = [
         { title: { $regex: search, $options: 'i' } },
         { author: { $regex: search, $options: 'i' } },
       ];
     }
 
-    if (genre) {
-      query.genre = genre;
+    // --- MODIFICATION START: Handle genre filtering ---
+    if (genreId) {
+      // If a specific genre ID is provided, use it directly.
+      query.genre = genreId;
+    } else if (genreSlug) {
+      // If a slug is provided, find the genre's ID first.
+      const genre = await Genre.findOne({ slug: genreSlug }).lean();
+      if (genre) {
+        query.genre = genre._id;
+      } else {
+        // If the genre slug is invalid, return no books.
+        return NextResponse.json([], { status: 200 });
+      }
     }
+    // --- MODIFICATION END ---
 
     if (featured === 'true') {
       query.featured = true;
     }
 
-    // TODO: Implement pagination by accepting `page` and `limit` search parameters
-    // and using `.skip()` and `.limit()` on the Mongoose query to handle large datasets.
-    const books = await Book.find(query).sort({ createdAt: -1 });
+    if (excludeId) {
+      query._id = { $ne: excludeId }; // $ne means 'not equal'
+    }
+
+    // --- MODIFICATION START: Build the query dynamically ---
+    let dbQuery = Book.find(query)
+      .populate('genre') // Crucial step: Populate the genre field with the full document
+      .sort({ createdAt: -1 });
+
+    // Apply limit if provided (e.g., for related books)
+    if (limit) {
+      const parsedLimit = parseInt(limit, 10);
+      if (!isNaN(parsedLimit)) {
+        dbQuery = dbQuery.limit(parsedLimit);
+      }
+    }
+
+    const books = await dbQuery;
+    // --- MODIFICATION END ---
 
     return NextResponse.json(books, { status: 200 });
   } catch (error) {
     console.error('Error fetching books:', error);
-    // TODO: Implement a robust logging service for production environments.
     return NextResponse.json(
       { message: 'Internal Server Error' },
       { status: 500 }
@@ -69,7 +98,6 @@ export async function GET(request: NextRequest) {
  * @returns {Promise<NextResponse>} A promise that resolves to the API response with the newly created book.
  */
 export async function POST(request: NextRequest) {
-  // Check for admin authentication using the session.
   const session = await auth();
   if (!session || session.user?.role !== 'admin') {
     return NextResponse.json(
@@ -82,17 +110,18 @@ export async function POST(request: NextRequest) {
     await connectDB();
 
     const body = await request.json();
-    // TODO: Use a validation library like Zod to parse and validate the request body
-    // against the expected IBook schema before attempting to save it to the database.
-    // This provides an early exit and clearer error messages for malformed requests.
+    // The request body should contain the 'genre' as the ObjectId string of the selected genre.
+    // Mongoose will automatically cast this string to an ObjectId.
+    // TODO: Use a validation library like Zod.
 
-    // Create a new book instance and save it to the database.
     const newBook = new Book(body);
     await newBook.save();
 
+    // Populate the genre before sending the response back
+    await newBook.populate('genre');
+
     return NextResponse.json(newBook, { status: 201 });
   } catch (error: any) {
-    // Specifically handle Mongoose validation errors to provide a more detailed client-side error.
     if (error.name === 'ValidationError') {
       return NextResponse.json(
         { message: 'Validation Error', errors: error.errors },

@@ -8,13 +8,14 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link"; // --- MODIFICATION: Import Link ---
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, Tag, Share2, Check } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { BookCard } from "@/components/books/BookCard";
 import { Separator } from "@/components/ui/separator";
 import { motion } from "framer-motion";
-import type { IBook } from "@/models/Book";
+import type { Book } from "@/types"; // --- MODIFICATION: Use front-end Book type ---
 import { JSX } from "react";
 import { toast } from "sonner";
 
@@ -22,17 +23,15 @@ import { toast } from "sonner";
  * Defines the props required by the `BookDetailClient` component.
  */
 interface BookDetailClientProps {
-  /** The main book object to display, conforming to the Mongoose IBook interface. */
-  book: IBook;
-  /** An array of related books to be displayed in a "You Might Also Like" section. */
-  relatedBooks: IBook[];
+  /** The main book object to display, conforming to the front-end Book type. */
+  book: Book;
+  /** An array of related books. */
+  relatedBooks: Book[];
 }
 
 /**
- * Renders the detailed view for a single book, including its cover, synopsis,
- * price, and interactive buttons for adding to cart and sharing.
- * It also displays a list of related books.
- * This is a client component to allow for interactivity and browser APIs.
+ * Renders the detailed view for a single book.
+ * This is a client component to allow for interactivity.
  *
  * @param {BookDetailClientProps} props - The props for the component.
  * @returns {JSX.Element} The rendered book detail page content.
@@ -44,37 +43,27 @@ export function BookDetailClient({
   const { addToCart } = useCart();
   const [isCopied, setIsCopied] = useState(false);
 
-  /**
-   * Handles the share action. It uses the Web Share API on supported devices (mobile)
-   * and falls back to copying the link to the clipboard on other devices (desktop).
-   */
   const handleShare = async () => {
     const shareData = {
       title: book.title,
       text: `Check out "${book.title}" by ${book.author} on TedBooks!`,
-      // window.location.href gets the full, current URL of the page.
       url: window.location.href,
     };
 
-    // Check if the Web Share API is available in the browser
     if (navigator.share) {
       try {
         await navigator.share(shareData);
-        console.log("Book shared successfully!");
       } catch (err) {
-        // Log error if user cancels share or an error occurs
         console.error("Share failed:", err);
       }
     } else {
-      // Fallback for desktop: copy link to clipboard
       try {
         await navigator.clipboard.writeText(window.location.href);
         setIsCopied(true);
-        // Reset the "Copied!" feedback message after 2 seconds
         setTimeout(() => setIsCopied(false), 2000);
       } catch (err) {
         console.error("Failed to copy link:", err);
-        toast("Failed to copy link to clipboard.");
+        toast.error("Failed to copy link to clipboard.");
       }
     }
   };
@@ -82,7 +71,6 @@ export function BookDetailClient({
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-16">
       <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-start">
-        {/* Animated container for the book cover image */}
         <motion.div
           className="relative aspect-[2/3] rounded-lg overflow-hidden shadow-xl"
           initial={{ opacity: 0, scale: 0.9 }}
@@ -99,7 +87,6 @@ export function BookDetailClient({
           />
         </motion.div>
 
-        {/* Animated container for the book's textual information */}
         <motion.div
           className="flex flex-col"
           initial={{ opacity: 0, x: 20 }}
@@ -109,22 +96,26 @@ export function BookDetailClient({
           <h1 className="text-3xl md:text-4xl font-bold mb-2">{book.title}</h1>
           <p className="text-xl text-muted-foreground mb-4">by {book.author}</p>
 
+          {/* --- MODIFICATION START: Clickable Genre Link --- */}
           <div className="flex items-center space-x-2 mb-6">
             <Tag className="h-5 w-5 text-primary" />
-            <span className="text-md font-medium text-primary">
-              {book.genre}
-            </span>
+            <Link
+              href={`/shop?genre=${book.genre.slug}`}
+              className="text-md font-medium text-primary hover:underline transition-colors"
+            >
+              {book.genre.name}
+            </Link>
           </div>
+          {/* --- MODIFICATION END --- */}
 
           <p className="text-3xl font-semibold text-primary mb-6">
             Ksh. {book.price.toFixed(2)}
           </p>
 
-          {/* Action buttons container */}
           <div className="flex flex-col sm:flex-row items-center gap-4 mb-8">
             <Button
               size="lg"
-              onClick={() => addToCart({ ...book, _id: book._id.toString() })}
+              onClick={() => addToCart(book)}
               className="w-full sm:w-auto shadow-md rounded-lg text-lg flex-grow"
             >
               <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
@@ -133,7 +124,7 @@ export function BookDetailClient({
               size="lg"
               variant="outline"
               onClick={handleShare}
-              disabled={isCopied} // Disable button briefly after copying
+              disabled={isCopied}
               className="w-full sm:w-auto shadow-md rounded-lg text-lg"
             >
               {isCopied ? (
@@ -159,7 +150,6 @@ export function BookDetailClient({
         </motion.div>
       </div>
 
-      {/* Conditionally renders the "Related Books" section if there are any. */}
       {relatedBooks.length > 0 && (
         <motion.section
           className="mt-16 md:mt-24"
@@ -172,12 +162,11 @@ export function BookDetailClient({
             You Might Also Like
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
+            {/* --- MODIFICATION START: Simplified props for BookCard --- */}
             {relatedBooks.map((relatedBook) => (
-              <BookCard
-                key={relatedBook._id.toString()}
-                book={{ ...relatedBook, _id: relatedBook._id.toString() }}
-              />
+              <BookCard key={relatedBook._id} book={relatedBook} />
             ))}
+            {/* --- MODIFICATION END --- */}
           </div>
         </motion.section>
       )}

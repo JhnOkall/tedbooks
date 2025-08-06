@@ -1,3 +1,10 @@
+export interface Genre {
+  _id: string;
+  name: string;
+  slug: string;
+  image: string;
+}
+
 /**
  * Defines the structure for a book object.
  */
@@ -35,7 +42,7 @@ export interface Book {
   /**
    * The genre or genre of the book.
    */
-  genre: string;
+ genre: Genre;
 
   /**
    * URL for the book's cover image.

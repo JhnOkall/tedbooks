@@ -6,7 +6,7 @@
 
 import { MainLayout } from "@/components/layout/MainLayout";
 import { BookList } from "@/components/books/BookList";
-import { getAllBooks } from "@/lib/data";
+import { getAllBooks, getGenreBySlug } from "@/lib/data";
 import { SearchInput } from "@/components/shared/SearchInput";
 import { JSX } from "react";
 
@@ -19,24 +19,17 @@ import { JSX } from "react";
  * @param {string} [props.searchParams.search] - The search term used to filter books.
  * @returns {Promise<JSX.Element>} A promise that resolves to the rendered shop page.
  */
+
 export default async function ShopPage({
   searchParams,
 }: {
-  searchParams?: { search?: string };
+  searchParams?: { search?: string; genre?: string };
 }): Promise<JSX.Element> {
-  // Extracts the search query from the URL's search parameters.
   const searchQuery = searchParams?.search;
+  const genreSlug = searchParams?.genre;
 
-  // Fetches the list of books from the data source, passing the search query for filtering.
-  // This data fetching occurs on the server.
-  const books = await getAllBooks(searchQuery);
-
-  // TODO: Implement pagination to handle a large number of books efficiently.
-  // This would involve passing page and limit parameters to `getAllBooks` and
-  // rendering pagination controls on the page.
-
-  // TODO: Add more advanced filtering capabilities, such as filtering by genre,
-  // price range, or sorting options. This would require UI controls and updated API/data-fetching logic.
+  const books = await getAllBooks({ searchQuery, genreSlug });
+  const genre = genreSlug ? await getGenreBySlug(genreSlug) : null;
 
   return (
     <MainLayout>
@@ -47,17 +40,12 @@ export default async function ShopPage({
             Browse through our extensive library of books.
           </p>
         </header>
+
         <div className="mb-8 max-w-xl mx-auto">
-          {/* TODO: The SearchInput component should be pre-populated with the current `searchQuery`
-          from the URL to provide a better user experience. */}
+          {/* No more prop is needed! The component handles its own state. */}
           <SearchInput />
         </div>
-        {/*
-          The fetched book data is passed to the BookList component.
-          The `_id` field (a Mongoose ObjectId) is converted to a string, which is a crucial
-          step to ensure the data is serializable and can be safely passed from a
-          Server Component to a Client Component.
-        */}
+
         <BookList
           books={books.map((book) => ({ ...book, _id: book._id.toString() }))}
         />
