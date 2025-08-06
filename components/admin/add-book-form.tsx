@@ -229,7 +229,7 @@ export function AddBookForm() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="genre">Category</Label>
+            <Label htmlFor="genre">Genre</Label>
             <Input
               name="genre"
               id="genre"

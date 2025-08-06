@@ -145,10 +145,10 @@ export async function getRelatedBooks(book: IBook): Promise<IBook[]> {
       return [];
     }
 
-    const booksInCategory: IBook[] = await res.json();
+    const booksInGenre: IBook[] = await res.json();
 
     // Filter out the current book from the results and limit to the first 4.
-    return booksInCategory
+    return booksInGenre
       .filter((relatedBook) => relatedBook._id !== book._id)
       .slice(0, 4);
   } catch (error) {
