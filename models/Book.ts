@@ -44,11 +44,11 @@ export interface IBook extends Document {
   synopsis: string;
 
   /**
-   * The category or genre of the book.
+   * The genre or genre of the book.
    */
-  // TODO: Refactor the 'category' field to use a String enum to ensure data consistency
+  // TODO: Refactor the 'genre' field to use a String enum to ensure data consistency
   // and prevent typos (e.g., ['Fiction', 'Non-Fiction', 'Science-Fiction']).
-  category: string;
+  genre: string;
 
   /**
    * The URL for the book's cover image.
@@ -109,9 +109,9 @@ const BookSchema: Schema<IBook> = new Schema(
       type: String,
       required: [true, 'Synopsis is required.'],
     },
-    category: {
+    genre: {
       type: String,
-      required: [true, 'Category is required.'],
+      required: [true, 'Genre is required.'],
     },
     coverImage: {
       type: String,
@@ -135,7 +135,7 @@ const BookSchema: Schema<IBook> = new Schema(
 );
 
 // TODO: Add database indexes to fields that are frequently queried, such as 'title',
-// 'author', and 'category', to improve search and filter performance.
+// 'author', and 'genre', to improve search and filter performance.
 // Example: BookSchema.index({ title: 'text', author: 'text' });
 
 /**

@@ -35,7 +35,7 @@ export default async function ShopPage({
   // This would involve passing page and limit parameters to `getAllBooks` and
   // rendering pagination controls on the page.
 
-  // TODO: Add more advanced filtering capabilities, such as filtering by category,
+  // TODO: Add more advanced filtering capabilities, such as filtering by genre,
   // price range, or sorting options. This would require UI controls and updated API/data-fetching logic.
 
   return (

@@ -99,7 +99,7 @@ export default async function BookDetailPage({ params }: Props) {
     return <NotFound />;
   }
 
-  // Fetch related books based on the main book's category.
+  // Fetch related books based on the main book's genre.
   const relatedBooks = await getRelatedBooks(book);
 
   // TODO: The `book` and `relatedBooks` objects are Mongoose documents. While Next.js can serialize

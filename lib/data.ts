@@ -116,31 +116,31 @@ export async function getBookById(id: string): Promise<IBook | null> {
 }
 
 /**
- * Fetches a list of books from the same category as a given book, to be used as
+ * Fetches a list of books from the same genre as a given book, to be used as
  * "related" or "recommended" products.
  *
- * @param {IBook} book - The primary book object used to determine the category.
+ * @param {IBook} book - The primary book object used to determine the genre.
  * @returns {Promise<IBook[]>} A promise that resolves to an array of up to 4 related books,
  * excluding the original book. Returns an empty array on failure.
  */
 export async function getRelatedBooks(book: IBook): Promise<IBook[]> {
-  if (!book.category) return [];
+  if (!book.genre) return [];
 
   const baseUrl = getBaseUrl();
   try {
     // TODO: Optimize this by enhancing the API. The API endpoint should support
-    // excluding an ID and limiting the results directly (e.g., `/api/books?category=...&excludeId=...&limit=4`)
+    // excluding an ID and limiting the results directly (e.g., `/api/books?genre=...&excludeId=...&limit=4`)
     // to avoid over-fetching and filtering on the client-side.
     const res = await fetch(
-      `${baseUrl}/api/books?category=${encodeURIComponent(book.category)}`,
+      `${baseUrl}/api/books?genre=${encodeURIComponent(book.genre)}`,
       {
-        next: { revalidate: 3600 }, // Cache category results for an hour.
+        next: { revalidate: 3600 }, // Cache genre results for an hour.
       }
     );
 
     if (!res.ok) {
       console.error(
-        `Failed to fetch related books for category ${book.category}: ${res.statusText}`
+        `Failed to fetch related books for genre ${book.genre}: ${res.statusText}`
       );
       return [];
     }
@@ -153,7 +153,7 @@ export async function getRelatedBooks(book: IBook): Promise<IBook[]> {
       .slice(0, 4);
   } catch (error) {
     console.error(
-      `Error fetching related books for category ${book.category}:`,
+      `Error fetching related books for genre ${book.genre}:`,
       error
     );
     return [];

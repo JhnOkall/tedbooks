@@ -112,7 +112,7 @@ export function BookDetailClient({
           <div className="flex items-center space-x-2 mb-6">
             <Tag className="h-5 w-5 text-primary" />
             <span className="text-md font-medium text-primary">
-              {book.category}
+              {book.genre}
             </span>
           </div>
 

@@ -33,9 +33,9 @@ export interface Book {
   synopsis: string;
 
   /**
-   * The category or genre of the book.
+   * The genre or genre of the book.
    */
-  category: string;
+  genre: string;
 
   /**
    * URL for the book's cover image.

@@ -13,7 +13,7 @@ import { IBook } from '@/models/Book';
 
 /**
  * Handles GET requests to fetch books from the database.
- * Supports filtering by category, featured status, and a text search on title and author.
+ * Supports filtering by genre, featured status, and a text search on title and author.
  *
  * @param {NextRequest} request - The incoming HTTP request object.
  * @returns {Promise<NextResponse>} A promise that resolves to the API response containing the list of books.
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
-    const category = searchParams.get('category');
+    const genre = searchParams.get('genre');
     const featured = searchParams.get('featured');
 
     // Build the MongoDB query object dynamically based on the provided search parameters.
@@ -38,8 +38,8 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    if (category) {
-      query.category = category;
+    if (genre) {
+      query.genre = genre;
     }
 
     if (featured === 'true') {

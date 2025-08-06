@@ -32,7 +32,7 @@ export function AddBookForm() {
     title: "",
     author: "",
     price: "",
-    category: "",
+    genre: "",
     description: "",
     synopsis: "",
     featured: false,
@@ -229,14 +229,14 @@ export function AddBookForm() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="category">Category</Label>
+            <Label htmlFor="genre">Category</Label>
             <Input
-              name="category"
-              id="category"
+              name="genre"
+              id="genre"
               placeholder="e.g., Fiction, Sci-Fi"
               required
               disabled={isSubmitting}
-              value={formData.category}
+              value={formData.genre}
               onChange={handleInputChange} // === MODIFICATION ===
             />
           </div>
