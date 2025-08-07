@@ -5,7 +5,7 @@
  */
 
 import { MainLayout } from "@/components/layout/MainLayout";
-import { FeaturedBooks } from "@/components/books/FeaturedBooks";
+import { BrowseGenres } from "@/components/books/FeaturedBooks";
 import { SearchInput } from "@/components/shared/SearchInput";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -14,7 +14,7 @@ import { JSX } from "react";
 /**
  * The main homepage component for the application.
  * As a React Server Component, it renders static content and includes other server
- * components like `FeaturedBooks` to fetch data server-side.
+ * components like `BrowseGenres` to fetch data server-side.
  *
  * @returns {JSX.Element} The rendered homepage.
  */
@@ -50,7 +50,7 @@ export default function HomePage(): JSX.Element {
 
       {/* Featured Books Section: Displays a curated list of books. */}
       {/* This is a server component that handles its own data fetching. */}
-      <FeaturedBooks />
+      <BrowseGenres />
     </MainLayout>
   );
 }
