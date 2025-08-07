@@ -1,15 +1,19 @@
 /**
  * @file Defines the client-side form for editing an existing book.
- * It handles form state, submission, AI generation, and uses the reusable FileUpload component.
+ * It handles form state, submission, AI generation, and uses a
+ * pre-populated dropdown for genre selection.
  */
 
 "use client";
 
-import { useState, FormEvent, ChangeEvent } from "react";
+// --- MODIFICATION START: Added useEffect for data fetching ---
+import { useState, FormEvent, ChangeEvent, useEffect } from "react";
+// --- MODIFICATION END ---
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { IBook } from "@/models/Book";
+import type { IGenre } from "@/models/Genre"; // <-- Import the Genre type
 
 import { CardContent, CardFooter } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -17,7 +21,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+// --- MODIFICATION START: Import Select components ---
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+// --- MODIFICATION END ---
 import { Save, Ban, Loader2, AlertCircle, Sparkles } from "lucide-react";
 import { FileUpload } from "./file-upload";
 
@@ -27,14 +39,52 @@ interface EditBookFormProps {
 
 /**
  * A client component that provides the interactive form for editing a book.
+ * It fetches available genres to display in a dropdown menu.
  */
 export function EditBookForm({ book }: EditBookFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // The formData state will now correctly hold and update the filePublicId
-  const [formData, setFormData] = useState<Partial<IBook>>(book);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // --- MODIFICATION START: State for genres dropdown ---
+  const [genres, setGenres] = useState<IGenre[]>([]);
+  const [isGenresLoading, setIsGenresLoading] = useState(true);
+  // --- MODIFICATION END ---
+
+  // --- MODIFICATION START: Updated formData state ---
+  // We initialize the form data from the `book` prop.
+  // The `featured` field is removed.
+  // `genre` is initialized with the ID of the book's current genre object.
+  const [formData, setFormData] = useState({
+    ...book,
+    // The book prop has a populated genre object. We need its ID for the Select value.
+    genre: (book.genre as IGenre)?._id?.toString() || "",
+  });
+  // --- MODIFICATION END ---
+
+  // --- MODIFICATION START: Fetch genres on component mount ---
+  useEffect(() => {
+    const fetchGenres = async () => {
+      try {
+        setIsGenresLoading(true);
+        const res = await fetch("/api/genres");
+        if (!res.ok) {
+          throw new Error("Could not fetch genres.");
+        }
+        const data = await res.json();
+        setGenres(data);
+      } catch (err) {
+        toast.error("Failed to load genres for selection.");
+        console.error(err);
+      } finally {
+        setIsGenresLoading(false);
+      }
+    };
+
+    fetchGenres();
+  }, []);
+  // --- MODIFICATION END ---
 
   const handleInputChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -42,6 +92,12 @@ export function EditBookForm({ book }: EditBookFormProps) {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
+
+  // --- MODIFICATION START: New handler for the Select component ---
+  const handleGenreChange = (value: string) => {
+    setFormData((prev) => ({ ...prev, genre: value }));
+  };
+  // --- MODIFICATION END ---
 
   const handleGenerateDescription = async () => {
     if (!formData.title || !formData.author) {
@@ -90,13 +146,15 @@ export function EditBookForm({ book }: EditBookFormProps) {
     setIsSubmitting(true);
     setError(null);
 
+    // Create a new object for submission, excluding the 'featured' property
+    const { featured, ...submissionData } = formData;
+
     try {
       toast.loading("Saving changes...");
       const res = await fetch(`/api/books/${book._id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        // The entire formData, including the potentially updated filePublicId, is sent
-        body: JSON.stringify(formData),
+        body: JSON.stringify(submissionData),
       });
 
       if (!res.ok) {
@@ -127,7 +185,7 @@ export function EditBookForm({ book }: EditBookFormProps) {
           </Alert>
         )}
 
-        {/* --- No changes needed in this section --- */}
+        {/* Title and Author fields are unchanged */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
@@ -153,7 +211,7 @@ export function EditBookForm({ book }: EditBookFormProps) {
           </div>
         </div>
 
-        {/* === NEW: AI Generation Button === */}
+        {/* AI Generation button is unchanged */}
         <div className="flex justify-start">
           <Button
             type="button"
@@ -180,6 +238,57 @@ export function EditBookForm({ book }: EditBookFormProps) {
           </Button>
         </div>
 
+        {/* --- MODIFICATION START: Added Genre Select dropdown and Price input --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <Label htmlFor="price">Price (KES)</Label>
+            <Input
+              name="price"
+              id="price"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="e.g., 1200.00"
+              required
+              disabled={isSubmitting}
+              value={formData.price}
+              onChange={handleInputChange}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="genre">Genre</Label>
+            <Select
+              name="genre"
+              value={formData.genre}
+              onValueChange={handleGenreChange}
+              required
+              disabled={isSubmitting || isGenresLoading}
+            >
+              <SelectTrigger id="genre">
+                <SelectValue placeholder="Select a genre..." />
+              </SelectTrigger>
+              <SelectContent>
+                {isGenresLoading ? (
+                  <SelectItem value="loading" disabled>
+                    Loading genres...
+                  </SelectItem>
+                ) : (
+                  genres.map((genre) => (
+                    <SelectItem
+                      key={genre._id.toString()}
+                      value={genre._id.toString()}
+                    >
+                      {genre.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        {/* --- MODIFICATION END --- */}
+
+        {/* Description and Synopsis textareas are unchanged */}
         <div className="space-y-2">
           <Label htmlFor="description">Short Description</Label>
           <Textarea
@@ -189,11 +298,9 @@ export function EditBookForm({ book }: EditBookFormProps) {
             onChange={handleInputChange}
             rows={3}
             required
-            disabled={isSubmitting || isGenerating} // === MODIFICATION ===
+            disabled={isSubmitting || isGenerating}
           />
         </div>
-
-        {/* === NEW: Synopsis Field === */}
         <div className="space-y-2">
           <Label htmlFor="synopsis">Full Synopsis</Label>
           <Textarea
@@ -208,6 +315,7 @@ export function EditBookForm({ book }: EditBookFormProps) {
           />
         </div>
 
+        {/* FileUpload components are unchanged */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FileUpload
             label="Cover Image"
@@ -215,7 +323,6 @@ export function EditBookForm({ book }: EditBookFormProps) {
             acceptedFileTypes="image/*"
             helpText="Upload a new file to replace the current one."
             initialUrl={formData.coverImage}
-            // === MODIFICATION: Handle the result object from onUploadComplete ===
             onUploadComplete={(result) =>
               setFormData((prev) => ({ ...prev, coverImage: result.url }))
             }
@@ -230,9 +337,7 @@ export function EditBookForm({ book }: EditBookFormProps) {
             acceptedFileTypes=".pdf,.epub"
             helpText="Upload a new file to replace the current one."
             initialUrl={formData.fileUrl}
-            // === MODIFICATION: Use the stable filePublicId as the initial file name ===
             initialFileName={book.filePublicId}
-            // === MODIFICATION: Update both fileUrl AND filePublicId on new upload ===
             onUploadComplete={(result) =>
               setFormData((prev) => ({
                 ...prev,
@@ -240,7 +345,6 @@ export function EditBookForm({ book }: EditBookFormProps) {
                 filePublicId: result.publicId,
               }))
             }
-            // === MODIFICATION: Revert both fileUrl AND filePublicId on removal ===
             onRemove={() =>
               setFormData((prev) => ({
                 ...prev,
@@ -252,20 +356,7 @@ export function EditBookForm({ book }: EditBookFormProps) {
           />
         </div>
 
-        {/* --- No changes needed in this section --- */}
-        <div className="flex items-center space-x-2 pt-2">
-          <Checkbox
-            id="featured"
-            checked={formData.featured || false}
-            onCheckedChange={(checked) =>
-              setFormData((prev) => ({ ...prev, featured: !!checked }))
-            }
-            disabled={isSubmitting || isGenerating}
-          />
-          <Label htmlFor="featured" className="font-normal cursor-pointer">
-            Mark as Featured Book
-          </Label>
-        </div>
+        {/* --- MODIFICATION: Removed the "Featured" checkbox --- */}
       </CardContent>
       <CardFooter className="flex justify-between pt-4">
         <Button type="button" variant="ghost" asChild className="rounded-lg">

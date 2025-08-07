@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Cog,
   Menu,
+  Layers,
 } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -45,6 +46,11 @@ const adminNavLinks = [
     href: "/admin/books",
     label: "Manage Books",
     icon: <BookCopy className="h-5 w-5" />,
+  },
+  {
+    href: "/admin/genres",
+    label: "Manage Genres",
+    icon: <Layers className="h-5 w-5" />,
   },
   {
     href: "/admin/orders",

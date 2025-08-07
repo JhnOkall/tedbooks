@@ -1,13 +1,17 @@
 /**
  * @file Defines the client-side form for creating a new book.
- * It handles form state, submission, AI generation, and uses the reusable FileUpload component.
+ * It handles form state, submission, AI generation, and uses a dropdown
+ * for genre selection populated from the database.
  */
 
 "use client";
 
-import { useState, FormEvent, ChangeEvent } from "react";
+// --- MODIFICATION START: Added useEffect for data fetching ---
+import { useState, FormEvent, ChangeEvent, useEffect } from "react";
+// --- MODIFICATION END ---
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import type { IGenre } from "@/models/Genre"; // <-- Import the Genre type
 
 import { CardContent, CardFooter } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -15,12 +19,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+// --- MODIFICATION START: Import Select components ---
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+// --- MODIFICATION END ---
 import { Save, Loader2, AlertCircle, Sparkles } from "lucide-react";
 import { FileUpload } from "./file-upload";
 
 /**
  * A client component that provides the interactive form for adding a book.
+ * It fetches available genres to display in a dropdown menu.
  */
 export function AddBookForm() {
   const router = useRouter();
@@ -28,20 +41,49 @@ export function AddBookForm() {
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // --- MODIFICATION START: State for genres dropdown ---
+  const [genres, setGenres] = useState<IGenre[]>([]);
+  const [isGenresLoading, setIsGenresLoading] = useState(true);
+  // --- MODIFICATION END ---
+
+  // --- MODIFICATION START: Updated formData state ---
+  // 'featured' is removed, and 'genre' will now store the genre's ID.
   const [formData, setFormData] = useState({
     title: "",
     author: "",
     price: "",
-    genre: "",
+    genre: "", // Will hold the selected genre's _id
     description: "",
     synopsis: "",
-    featured: false,
   });
+  // --- MODIFICATION END ---
 
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const [bookFileUrl, setBookFileUrl] = useState<string | null>(null);
-  // === MODIFICATION: Add state for the file's public ID ===
   const [filePublicId, setFilePublicId] = useState<string | null>(null);
+
+  // --- MODIFICATION START: Fetch genres on component mount ---
+  useEffect(() => {
+    const fetchGenres = async () => {
+      try {
+        setIsGenresLoading(true);
+        const res = await fetch("/api/genres");
+        if (!res.ok) {
+          throw new Error("Could not fetch genres.");
+        }
+        const data = await res.json();
+        setGenres(data);
+      } catch (err) {
+        toast.error("Failed to load genres for selection.");
+        console.error(err);
+      } finally {
+        setIsGenresLoading(false);
+      }
+    };
+
+    fetchGenres();
+  }, []);
+  // --- MODIFICATION END ---
 
   const handleInputChange = (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -49,6 +91,12 @@ export function AddBookForm() {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
+
+  // --- MODIFICATION START: New handler for the Select component ---
+  const handleGenreChange = (value: string) => {
+    setFormData((prev) => ({ ...prev, genre: value }));
+  };
+  // --- MODIFICATION END ---
 
   const handleGenerateDescription = async () => {
     if (!formData.title || !formData.author) {
@@ -97,25 +145,31 @@ export function AddBookForm() {
     setIsSubmitting(true);
     setError(null);
 
+    // --- MODIFICATION START: Updated validation checks ---
     if (!coverImageUrl) {
-      setError("Please upload a cover image first.");
+      setError("Please upload a cover image.");
       setIsSubmitting(false);
       return;
     }
-    // === MODIFICATION: Check for both book file URL and public ID ===
     if (!bookFileUrl || !filePublicId) {
-      setError("Please upload a book file first.");
+      setError("Please upload a book file.");
       setIsSubmitting(false);
       return;
     }
+    if (!formData.genre) {
+      setError("Please select a genre.");
+      setIsSubmitting(false);
+      return;
+    }
+    // --- MODIFICATION END ---
 
     try {
+      // The `formData` object is now correctly structured without 'featured'.
       const bookData = {
         ...formData,
         price: Number(formData.price),
         coverImage: coverImageUrl,
         fileUrl: bookFileUrl,
-        // === MODIFICATION: Include the filePublicId in the request body ===
         filePublicId: filePublicId,
       };
 
@@ -128,7 +182,6 @@ export function AddBookForm() {
 
       if (!res.ok) {
         const errorData = await res.json();
-        // Use the detailed validation error if available
         const validationMessage = errorData.errors
           ? Object.values(errorData.errors)
               .map((e: any) => e.message)
@@ -159,6 +212,7 @@ export function AddBookForm() {
           </Alert>
         )}
 
+        {/* Title and Author fields are unchanged */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
@@ -186,6 +240,7 @@ export function AddBookForm() {
           </div>
         </div>
 
+        {/* AI Generation button is unchanged */}
         <div className="flex justify-start">
           <Button
             type="button"
@@ -225,22 +280,44 @@ export function AddBookForm() {
               required
               disabled={isSubmitting}
               value={formData.price}
-              onChange={handleInputChange} // === MODIFICATION ===
+              onChange={handleInputChange}
             />
           </div>
+          {/* --- MODIFICATION START: Replaced Input with Select for Genre --- */}
           <div className="space-y-2">
             <Label htmlFor="genre">Genre</Label>
-            <Input
+            <Select
               name="genre"
-              id="genre"
-              placeholder="e.g., Fiction, Sci-Fi"
-              required
-              disabled={isSubmitting}
               value={formData.genre}
-              onChange={handleInputChange} // === MODIFICATION ===
-            />
+              onValueChange={handleGenreChange}
+              required
+              disabled={isSubmitting || isGenresLoading}
+            >
+              <SelectTrigger id="genre">
+                <SelectValue placeholder="Select a genre..." />
+              </SelectTrigger>
+              <SelectContent>
+                {isGenresLoading ? (
+                  <SelectItem value="loading" disabled>
+                    Loading genres...
+                  </SelectItem>
+                ) : (
+                  genres.map((genre) => (
+                    <SelectItem
+                      key={genre._id.toString()}
+                      value={genre._id.toString()}
+                    >
+                      {genre.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
           </div>
+          {/* --- MODIFICATION END --- */}
         </div>
+
+        {/* Description and Synopsis textareas are unchanged */}
         <div className="space-y-2">
           <Label htmlFor="description">
             Short Description (for card views)
@@ -253,7 +330,7 @@ export function AddBookForm() {
             required
             disabled={isSubmitting}
             value={formData.description}
-            onChange={handleInputChange} // === MODIFICATION ===
+            onChange={handleInputChange}
           />
         </div>
         <div className="space-y-2">
@@ -266,12 +343,12 @@ export function AddBookForm() {
             required
             disabled={isSubmitting}
             value={formData.synopsis}
-            onChange={handleInputChange} // === MODIFICATION ===
+            onChange={handleInputChange}
           />
         </div>
 
+        {/* FileUpload components are unchanged */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* === MODIFICATION: Update how onUploadComplete is handled === */}
           <FileUpload
             label="Cover Image"
             uploadType="image"
@@ -281,7 +358,6 @@ export function AddBookForm() {
             onRemove={() => setCoverImageUrl(null)}
             disabled={isSubmitting}
           />
-          {/* === MODIFICATION: Update onUploadComplete and onRemove for the book file === */}
           <FileUpload
             label="Book File"
             uploadType="file"
@@ -299,29 +375,17 @@ export function AddBookForm() {
           />
         </div>
 
-        <div className="flex items-center space-x-2 pt-2">
-          <Checkbox
-            name="featured"
-            id="featured"
-            disabled={isSubmitting}
-            checked={formData.featured} // === MODIFICATION ===
-            onCheckedChange={(checked) =>
-              setFormData((prev) => ({ ...prev, featured: Boolean(checked) }))
-            } // === MODIFICATION ===
-          />
-          <Label htmlFor="featured" className="font-normal cursor-pointer">
-            Mark as Featured Book
-          </Label>
-        </div>
+        {/* --- MODIFICATION: Removed the "Featured" checkbox --- */}
       </CardContent>
       <CardFooter className="flex justify-end pt-4">
-        {/* === MODIFICATION: Add filePublicId to the disabled check === */}
+        {/* --- MODIFICATION: Updated disabled check --- */}
         <Button
           type="submit"
           className="rounded-lg shadow-md"
           disabled={
             isSubmitting ||
             isGenerating ||
+            !formData.genre || // <-- Check if a genre is selected
             !coverImageUrl ||
             !bookFileUrl ||
             !filePublicId
