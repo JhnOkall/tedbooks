@@ -8,8 +8,8 @@
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { useState, FormEvent, JSX } from "react";
-// --- MODIFICATION START: Import necessary hooks ---
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+// --- MODIFICATION START: Import necessary hooks (usePathname removed) ---
+import { useRouter, useSearchParams } from "next/navigation";
 // --- MODIFICATION END ---
 
 /**
@@ -22,7 +22,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 export function SearchInput(): JSX.Element {
   // --- MODIFICATION START: Use hooks to interact with the URL ---
   const router = useRouter();
-  const pathname = usePathname(); // Gets the current path, e.g., "/shop"
+  // `usePathname` is removed as searches now always go to the `/shop` page.
   const searchParams = useSearchParams(); // Gets the current URL query params
 
   // Initialize the input's state directly from the 'search' URL parameter.
@@ -54,10 +54,12 @@ export function SearchInput(): JSX.Element {
       params.delete("search");
     }
 
-    // Construct the new URL and navigate.
-    // This preserves other params like `genre` automatically.
-    // Example: from /shop?genre=sci-fi, a search for "dune" becomes /shop?genre=sci-fi&search=dune
-    router.push(`${pathname}?${params.toString()}`);
+    // --- MODIFICATION START: Always navigate to the /shop page on search ---
+    // This ensures that any search initiated from any page (e.g., the homepage)
+    // will lead the user to the main `/shop` results page, while preserving
+    // other existing filters.
+    router.push(`/shop?${params.toString()}`);
+    // --- MODIFICATION END ---
   };
 
   return (
