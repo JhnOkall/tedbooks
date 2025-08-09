@@ -11,7 +11,8 @@ import Link from "next/link";
 import type { Book } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardTitle } from "@/components/ui/card";
-import { ShoppingCart } from "lucide-react";
+// --- 1. Import new icons ---
+import { ShoppingCart, Star, Eye, Download } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { motion } from "framer-motion";
 import { JSX } from "react";
@@ -43,10 +44,7 @@ export function BookCard({ book }: BookCardProps): JSX.Element {
       whileHover={{ y: -5, scale: 1.03 }}
       transition={{ type: "spring", stiffness: 300 }}
     >
-      {/* Added p-0 to remove default padding from Card */}
       <Card className="flex flex-col overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 group p-0">
-        {/* The book cover image, linked to the book's detail page.
-            Now directly inside Card with no spacing */}
         <Link
           href={`/book/${book._id}`}
           className="block aspect-[2/3] relative overflow-hidden"
@@ -71,10 +69,23 @@ export function BookCard({ book }: BookCardProps): JSX.Element {
             </Link>
           </CardTitle>
           <p className="text-sm text-muted-foreground mb-2">{book.author}</p>
-          {/* Using `flex-grow` on the description helps align footers in a row if descriptions have varying lengths */}
-          <p className="text-xs text-foreground/80 line-clamp-3 flex-grow">
-            {book.description}
-          </p>
+
+          {/* --- 2. MOCK-UP: Stats section replaces the description --- */}
+          {/* This `flex-grow` div ensures the footer is always pushed to the bottom. */}
+          <div className="flex-grow flex items-center gap-4 text-sm text-muted-foreground mt-2">
+            <div className="flex items-center gap-1" title="Rating">
+              <Star className="h-4 w-4 fill-yellow-400 text-yellow-500" />
+              <span>4.7</span>
+            </div>
+            <div className="flex items-center gap-1" title="Views">
+              <Eye className="h-4 w-4" />
+              <span>1.2k</span>
+            </div>
+            <div className="flex items-center gap-1" title="Downloads">
+              <Download className="h-4 w-4" />
+              <span>342</span>
+            </div>
+          </div>
         </CardContent>
 
         <CardFooter className="p-4 flex flex-col gap-2 mt-auto">
