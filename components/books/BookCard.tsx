@@ -77,18 +77,17 @@ export function BookCard({ book }: BookCardProps): JSX.Element {
           </p>
         </CardContent>
 
-        <CardFooter className="p-4 flex justify-between items-center mt-auto">
-          {/* TODO: The currency symbol 'Ksh.' is hardcoded. Refactor to use a centralized
-          currency formatting utility or context to support internationalization. */}
+        <CardFooter className="p-4 flex flex-col gap-2 mt-auto">
           <p className="text-xl font-bold text-primary">
             Ksh. {book.price.toFixed(2)}
           </p>
           <Button
             size="sm"
+            className="w-full"
             onClick={() => addToCart(book)}
             aria-label={`Add ${book.title} to cart`}
           >
-            <ShoppingCart className="mr-2 h-4 w-4" /> Add
+            <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
           </Button>
         </CardFooter>
       </Card>

@@ -223,7 +223,7 @@ export default function TermsAndConditionsPage(): JSX.Element {
               <p>
                 {/* TODO: The contact email is hardcoded. This should be an environment
                 variable or a value fetched from the SiteContent API to be easily configurable. */}
-                <strong>support@tedbooks.example.com</strong>
+                <strong>support@tedbooks.co.ke</strong>
               </p>
             </TermSection>
           </CardContent>
