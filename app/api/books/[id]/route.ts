@@ -31,9 +31,6 @@ export async function GET(
 
     const book = await Book.findById(id).populate('genre');
 
-     console.log('--- 1. API_ROUTE (/api/books/[id]) ---');
-    console.log('Book fetched from DB with populated genre:', JSON.stringify(book, null, 2));
-
     // If no book is found with the given ID, return a 404 Not Found response.
     if (!book) {
       return NextResponse.json({ message: 'Book not found' }, { status: 404 });
