@@ -53,7 +53,28 @@ export function BookDetailClient({
   };
 
   const handleShare = async () => {
-    // ... (handleShare function remains the same)
+    const shareData = {
+      title: book.title,
+      text: `Check out "${book.title}" by ${book.author} on TedBooks!`,
+      url: window.location.href,
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        console.error("Share failed:", err);
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      } catch (err) {
+        console.error("Failed to copy link:", err);
+        toast.error("Failed to copy link to clipboard.");
+      }
+    }
   };
 
   return (
@@ -151,11 +172,39 @@ export function BookDetailClient({
             </p>
 
             <div className="flex flex-col sm:flex-row items-center gap-4 mb-8">
-              {/* ... (Buttons remain the same) ... */}
+              <Button
+                size="lg"
+                onClick={() => addToCart(book)}
+                className="w-full sm:w-auto shadow-md rounded-lg text-lg flex-grow"
+              >
+                <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={handleShare}
+                disabled={isCopied}
+                className="w-full sm:w-auto shadow-md rounded-lg text-lg"
+              >
+                {isCopied ? (
+                  <>
+                    <Check className="mr-2 h-5 w-5 text-green-500" /> Copied!
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="mr-2 h-5 w-5" /> Share
+                  </>
+                )}
+              </Button>
             </div>
 
             <div className="space-y-4">
-              {/* ... (Synopsis remains the same) ... */}
+              <h2 className="text-2xl font-semibold">Synopsis</h2>
+              <div className="prose prose-lg max-w-none text-foreground/80 dark:prose-invert">
+                {book.synopsis.split("\n").map((paragraph, index) => (
+                  <p key={index}>{paragraph}</p>
+                ))}
+              </div>
             </div>
           </motion.div>
         </div>
