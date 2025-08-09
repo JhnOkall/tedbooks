@@ -84,37 +84,37 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  * The main server component for the book detail page.
  * It fetches the required data on the server and passes it down to a client component
  * for interactive rendering.
- *
- * @param {Props} props - The props containing the dynamic route parameters.
- * @returns {Promise<JSX.Element>} A promise that resolves to the rendered page.
  */
 export default async function BookDetailPage({ params }: Props) {
-  // This fetch is automatically de-duplicated by Next.js if `generateMetadata`
-  // also called it with the same arguments.
   const book = await getBookById(params.id);
 
-  // If the book is not found, render the custom 404 page.
-  // This is the standard way to trigger a "not found" state from a server component.
   if (!book) {
     return <NotFound />;
   }
 
-  // Fetch related books based on the main book's genre.
-  const relatedBooks = await getRelatedBooks(book.genre._id, book._id);
+  // --- FIX START: Sanitize the Mongoose document to a plain object ---
+  // This is the crucial step. It ensures the 'genre' field is a plain object.
+  const plainBook = JSON.parse(JSON.stringify(book));
+  // --- FIX END ---
 
-  // TODO: The `book` and `relatedBooks` objects are Mongoose documents. While Next.js can serialize
-  // them, it's a best practice to convert them to plain JavaScript objects before passing them
-  // to a client component to avoid any potential serialization issues with complex Mongoose properties.
-  // e.g., `const plainBook = JSON.parse(JSON.stringify(book));`
+  // Now, use the sanitized 'plainBook' object to fetch related books.
+  // This guarantees that `plainBook.genre._id` is a valid string.
+  const relatedBooks = await getRelatedBooks(
+    plainBook.genre._id,
+    plainBook._id
+  );
+
+  // --- FIX START: Also sanitize the related books array for consistency ---
+  const plainRelatedBooks = JSON.parse(JSON.stringify(relatedBooks));
+  // --- FIX END ---
 
   return (
     <MainLayout>
       {/*
-        The data is passed to a client component (`BookDetailClient`) because the detail
-        page contains interactive elements like an "Add to Cart" button, which requires
-        client-side JavaScript and context hooks.
+        Pass the plain, serializable objects to the client component.
+        This prevents any serialization issues.
       */}
-      <BookDetailClient book={book} relatedBooks={relatedBooks} />
+      <BookDetailClient book={plainBook} relatedBooks={plainRelatedBooks} />
     </MainLayout>
   );
 }
