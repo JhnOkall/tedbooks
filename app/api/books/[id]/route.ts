@@ -29,7 +29,7 @@ export async function GET(
     // TODO: Add validation to ensure the provided `id` is a valid MongoDB ObjectId format
     // before querying the database to prevent malformed requests and potential errors.
 
-    const book = await Book.findById(id);
+    const book = await Book.findById(id).populate('genre');
 
     // If no book is found with the given ID, return a 404 Not Found response.
     if (!book) {
