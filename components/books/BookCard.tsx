@@ -77,7 +77,7 @@ export function BookCard({ book }: BookCardProps): JSX.Element {
           </p> */}
         </CardContent>
 
-        <CardFooter className="p-4 flex flex-col gap-1 mt-auto">
+        <CardFooter className="p-4 flex flex-col mt-auto">
           <p className="text-xl font-bold text-primary">
             Ksh. {book.price.toFixed(2)}
           </p>
