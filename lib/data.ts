@@ -142,14 +142,13 @@ export async function getBookById(id: string): Promise<Book | null> {
  * @returns {Promise<Book[]>} A promise that resolves to an array of up to 4 related books.
  */
 // --- MODIFICATION START ---
-export async function getRelatedBooks(book: Book): Promise<Book[]> {
-  // The 'book' object now has a 'genre' object with an '_id'
-  if (!book.genre?._id) return [];
+export async function getRelatedBooks(genreId: string, excludeBookId?: string): Promise<Book[]> {
+  if (!genreId) return [];
 
   const baseUrl = getBaseUrl();
   try {
     // API is enhanced to handle filtering by genre ID, excluding a specific book, and limiting results.
-    const url = `${baseUrl}/api/books?genreId=${book.genre._id}&exclude=${book._id}&limit=4`;
+    const url = `${baseUrl}/api/books?genreId=${genreId}&exclude=${excludeBookId || ''}&limit=4`;
 
     const res = await fetch(url, {
       next: { revalidate: 3600 }, // Cache related books for an hour
@@ -157,7 +156,7 @@ export async function getRelatedBooks(book: Book): Promise<Book[]> {
 
     if (!res.ok) {
       console.error(
-        `Failed to fetch related books for genre ${book.genre.name}: ${res.statusText}`
+        `Failed to fetch related books for genre ${genreId}: ${res.statusText}`
       );
       return [];
     }
@@ -165,7 +164,7 @@ export async function getRelatedBooks(book: Book): Promise<Book[]> {
     return res.json();
   } catch (error) {
     console.error(
-      `Error fetching related books for genre ${book.genre.name}:`,
+      `Error fetching related books for genre ${genreId}:`,
       error
     );
     return [];
