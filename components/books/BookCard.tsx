@@ -10,7 +10,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Book } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { ShoppingCart } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { motion } from "framer-motion";
@@ -34,19 +34,18 @@ interface BookCardProps {
  * @returns {JSX.Element} The rendered BookCard component.
  */
 export function BookCard({ book }: BookCardProps): JSX.Element {
-  // Retrieves the `addToCart` function from the global cart context.
   const { addToCart } = useCart();
 
   return (
-    // Wraps the card in a motion component for a subtle hover animation.
+    // Add h-full to ensure the motion div fills its parent grid cell.
     <motion.div
+      className="h-full"
       whileHover={{ y: -5, scale: 1.03 }}
       transition={{ type: "spring", stiffness: 300 }}
     >
-      {/* Added p-0 to remove default padding from Card */}
-      <Card className="flex flex-col overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 group p-0">
-        {/* The book cover image, linked to the book's detail page.
-            Now directly inside Card with no spacing */}
+      {/* Add h-full and flex flex-col to the Card to make it a flexible container that fills all available vertical space. */}
+      <Card className="h-full flex flex-col overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 group p-0">
+        {/* The book cover image remains the same. */}
         <Link
           href={`/book/${book._id}`}
           className="block aspect-[2/3] relative overflow-hidden"
@@ -61,35 +60,37 @@ export function BookCard({ book }: BookCardProps): JSX.Element {
           />
         </Link>
 
-        <CardContent className="p-4 flex-grow flex flex-col">
-          <CardTitle className="text-lg font-semibold leading-tight mb-1">
-            <Link
-              href={`/book/${book._id}`}
-              className="hover:text-primary transition-colors line-clamp-2"
-            >
-              {book.title}
-            </Link>
-          </CardTitle>
-          <p className="text-sm text-muted-foreground mb-2">{book.author}</p>
-          {/* Using `flex-grow` on the description helps align footers in a row if descriptions have varying lengths */}
-          {/*  <p className="text-xs text-foreground/80 line-clamp-3 flex-grow">
-            {book.description}
-          </p> */}
-        </CardContent>
+        {/* CardContent is now a flex column that grows to fill remaining space. */}
+        <CardContent className="p-4 flex flex-col flex-grow">
+          {/* This div wraps the title and author. */}
+          <div>
+            <CardTitle className="text-lg font-semibold leading-tight mb-1">
+              {/* Set a fixed height on the title's link to ensure consistency. h-12 is enough for 2 lines. */}
+              <Link
+                href={`/book/${book._id}`}
+                className="hover:text-primary transition-colors line-clamp-2 h-12"
+              >
+                {book.title}
+              </Link>
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">{book.author}</p>
+          </div>
 
-        <CardFooter className="p-4 flex flex-col mt-auto">
-          <p className="text-xl font-bold text-primary">
-            Ksh. {book.price.toFixed(2)}
-          </p>
-          <Button
-            size="sm"
-            className="w-full"
-            onClick={() => addToCart(book)}
-            aria-label={`Add ${book.title} to cart`}
-          >
-            <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
-          </Button>
-        </CardFooter>
+          {/* This div wraps the price and button. `mt-auto` pushes it to the bottom of CardContent. */}
+          <div className="mt-auto pt-4 space-y-2">
+            <p className="text-xl font-bold text-primary">
+              Ksh. {book.price.toFixed(2)}
+            </p>
+            <Button
+              size="sm"
+              className="w-full"
+              onClick={() => addToCart(book)}
+              aria-label={`Add ${book.title} to cart`}
+            >
+              <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
+            </Button>
+          </div>
+        </CardContent>
       </Card>
     </motion.div>
   );
