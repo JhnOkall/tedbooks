@@ -11,87 +11,125 @@ import Link from "next/link";
 import type { Book } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
-import { ShoppingCart } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { ShoppingCart, Star, Eye, Download } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { motion } from "framer-motion";
 import { JSX } from "react";
 
-/**
- * Defines the props required by the `BookCard` component.
- */
 interface BookCardProps {
-  /**
-   * The book object containing all the data to be displayed.
-   */
   book: Book;
 }
 
-/**
- * A reusable UI component that renders a book's details in a card.
- * Provides a link to the book's detail page and functionality to add the book to the cart.
- *
- * @param {BookCardProps} props - The props for the component.
- * @returns {JSX.Element} The rendered BookCard component.
- */
 export function BookCard({ book }: BookCardProps): JSX.Element {
   const { addToCart } = useCart();
 
+  // Mock data for the new fields
+  const mockData = {
+    rating: 4.5,
+    views: "1.2k",
+    downloads: 540,
+  };
+
   return (
-    // Add h-full to ensure the motion div fills its parent grid cell.
-    <motion.div
-      className="h-full"
-      whileHover={{ y: -5, scale: 1.03 }}
-      transition={{ type: "spring", stiffness: 300 }}
-    >
-      {/* Add h-full and flex flex-col to the Card to make it a flexible container that fills all available vertical space. */}
-      <Card className="h-full flex flex-col overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 group p-0">
-        {/* The book cover image remains the same. */}
-        <Link
-          href={`/book/${book._id}`}
-          className="block aspect-[2/3] relative overflow-hidden"
-          aria-label={`View details for ${book.title}`}
-        >
-          <Image
-            src={book.coverImage}
-            alt={`Cover of ${book.title}`}
-            fill
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
-          />
-        </Link>
+    <TooltipProvider delayDuration={200}>
+      <motion.div
+        className="h-full"
+        whileHover={{ y: -5, scale: 1.03 }}
+        transition={{ type: "spring", stiffness: 300 }}
+      >
+        <Card className="h-full flex flex-col overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 group p-0">
+          <Link
+            href={`/book/${book._id}`}
+            className="block aspect-[2/3] relative overflow-hidden"
+            aria-label={`View details for ${book.title}`}
+          >
+            <Image
+              src={book.coverImage}
+              alt={`Cover of ${book.title}`}
+              fill
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              className="object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          </Link>
 
-        {/* CardContent is now a flex column that grows to fill remaining space. */}
-        <CardContent className="p-4 flex flex-col flex-grow">
-          {/* This div wraps the title and author. */}
-          <div>
-            <CardTitle className="text-lg font-semibold leading-tight mb-1">
-              {/* Set a fixed height on the title's link to ensure consistency. h-12 is enough for 2 lines. */}
-              <Link
-                href={`/book/${book._id}`}
-                className="hover:text-primary transition-colors line-clamp-2 h-12"
+          <CardContent className="p-4 flex flex-col flex-grow">
+            <div>
+              <CardTitle className="text-lg font-semibold leading-tight mb-1">
+                <Link
+                  href={`/book/${book._id}`}
+                  className="hover:text-primary transition-colors line-clamp-2 h-12"
+                >
+                  {book.title}
+                </Link>
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mb-2">
+                {book.author}
+              </p>
+            </div>
+
+            {/* --- NEW META DATA SECTION --- */}
+            <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center">
+                    {/* The star is filled for a better visual */}
+                    <Star className="h-4 w-4 mr-1 fill-amber-400 text-amber-500" />
+                    <span>{mockData.rating}</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Average Rating</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center">
+                    <Eye className="h-4 w-4 mr-1" />
+                    <span>{mockData.views}</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Total Views</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center">
+                    <Download className="h-4 w-4 mr-1" />
+                    <span>{mockData.downloads}</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Total Downloads</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            {/* --- END OF NEW SECTION --- */}
+
+            <div className="mt-auto pt-4 space-y-2">
+              <p className="text-xl font-bold text-primary">
+                Ksh. {book.price.toFixed(2)}
+              </p>
+              <Button
+                size="sm"
+                className="w-full"
+                onClick={() => addToCart(book)}
+                aria-label={`Add ${book.title} to cart`}
               >
-                {book.title}
-              </Link>
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">{book.author}</p>
-          </div>
-
-          {/* This div wraps the price and button. `mt-auto` pushes it to the bottom of CardContent. */}
-          <div className="mt-auto pt-4 space-y-2">
-            <p className="text-xl font-bold text-primary">
-              Ksh. {book.price.toFixed(2)}
-            </p>
-            <Button
-              size="sm"
-              className="w-full"
-              onClick={() => addToCart(book)}
-              aria-label={`Add ${book.title} to cart`}
-            >
-              <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+                <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </TooltipProvider>
   );
 }
