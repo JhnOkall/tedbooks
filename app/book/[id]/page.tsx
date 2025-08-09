@@ -88,6 +88,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function BookDetailPage({ params }: Props) {
   const book = await getBookById(params.id);
 
+  console.log("\n--- 2. SERVER_PAGE (BookDetailPage) ---");
+  console.log(
+    "Initial `book` object received from getBookById:",
+    JSON.stringify(book, null, 2)
+  );
+
   if (!book) {
     return <NotFound />;
   }
@@ -95,6 +101,14 @@ export default async function BookDetailPage({ params }: Props) {
   // --- FIX START: Sanitize the Mongoose document to a plain object ---
   // This is the crucial step. It ensures the 'genre' field is a plain object.
   const plainBook = JSON.parse(JSON.stringify(book));
+
+  console.log("--- 3. SERVER_PAGE (BookDetailPage) ---");
+  console.log(
+    "Fetching related books with genreId:",
+    plainBook.genre?._id, // Using optional chaining for safety
+    "and excludeBookId:",
+    plainBook._id
+  );
   // --- FIX END ---
 
   // Now, use the sanitized 'plainBook' object to fetch related books.
@@ -103,6 +117,9 @@ export default async function BookDetailPage({ params }: Props) {
     plainBook.genre._id,
     plainBook._id
   );
+
+  console.log("--- 4. SERVER_PAGE (BookDetailPage) ---");
+  console.log(`Found ${relatedBooks.length} related books.`);
 
   // --- FIX START: Also sanitize the related books array for consistency ---
   const plainRelatedBooks = JSON.parse(JSON.stringify(relatedBooks));

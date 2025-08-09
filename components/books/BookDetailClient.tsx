@@ -42,6 +42,9 @@ export function BookDetailClient({
   book,
   relatedBooks,
 }: BookDetailClientProps): JSX.Element {
+  console.log("--- 5. CLIENT_COMPONENT (BookDetailClient) ---");
+  console.log("Props received in browser -> book:", book);
+  console.log("Props received in browser -> relatedBooks:", relatedBooks);
   const { addToCart } = useCart();
   const [isCopied, setIsCopied] = useState(false);
 
