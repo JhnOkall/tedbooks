@@ -39,17 +39,21 @@ export function BookList({
   searchQuery,
   genreSlug,
 }: BookListProps): JSX.Element {
-  const [books, setBooks] = useState<Book[]>(initialBooks);
+  // Ensure initialBooks is always an array
+  const safeInitialBooks = Array.isArray(initialBooks) ? initialBooks : [];
+
+  const [books, setBooks] = useState<Book[]>(safeInitialBooks);
   const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(initialBooks.length === 12); // Assuming 12 books per page
+  const [hasMore, setHasMore] = useState(safeInitialBooks.length === 12); // Assuming 12 books per page
   const [page, setPage] = useState(1);
   const observerRef = useRef<HTMLDivElement>(null);
 
   // Reset books when search query or genre changes
   useEffect(() => {
-    setBooks(initialBooks);
+    const safeBooksArray = Array.isArray(initialBooks) ? initialBooks : [];
+    setBooks(safeBooksArray);
     setPage(1);
-    setHasMore(initialBooks.length === 12);
+    setHasMore(safeBooksArray.length === 12);
   }, [initialBooks, searchQuery, genreSlug]);
 
   // Function to load more books
@@ -72,7 +76,17 @@ export function BookList({
 
       const response = await fetch(`/api/books?${params.toString()}`);
       if (response.ok) {
-        const newBooks: Book[] = await response.json();
+        const data = await response.json();
+
+        // Handle both paginated and non-paginated responses
+        let newBooks: Book[] = [];
+        if (data && typeof data === "object" && Array.isArray(data.books)) {
+          newBooks = data.books;
+        } else if (Array.isArray(data)) {
+          newBooks = data;
+        } else {
+          console.warn("Unexpected response format:", data);
+        }
 
         if (newBooks.length === 0) {
           setHasMore(false);
@@ -81,9 +95,13 @@ export function BookList({
           setPage((prev) => prev + 1);
           setHasMore(newBooks.length === 12);
         }
+      } else {
+        console.error("Failed to fetch more books:", response.statusText);
+        setHasMore(false);
       }
     } catch (error) {
       console.error("Error loading more books:", error);
+      setHasMore(false);
     } finally {
       setLoading(false);
     }

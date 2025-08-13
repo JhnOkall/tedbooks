@@ -78,12 +78,18 @@ export async function getAllBooks(params: {
     const data = await res.json();
     
     // Check if the response includes pagination info (when page parameter is used)
-    if (data.books) {
+    if (data && typeof data === 'object' && Array.isArray(data.books)) {
       return data.books;
     }
     
     // Fallback for responses without pagination wrapper
-    return data;
+    if (Array.isArray(data)) {
+      return data;
+    }
+    
+    // If data is not in expected format, return empty array
+    console.warn('Unexpected data format from API:', data);
+    return [];
   } catch (error) {
     console.error('An error occurred in getAllBooks:', error);
     return [];

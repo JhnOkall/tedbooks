@@ -34,6 +34,9 @@ export default async function ShopPage({
   const initialBooks = await getAllBooks({ searchQuery, genreSlug });
   const genre = genreSlug ? await getGenreBySlug(genreSlug) : null;
 
+  // Ensure we always have an array of books
+  const safeInitialBooks = Array.isArray(initialBooks) ? initialBooks : [];
+
   // Determine the page title based on current filters
   let pageTitle = "Our Collection";
   let pageDescription = "Browse through our extensive library of books.";
@@ -54,7 +57,10 @@ export default async function ShopPage({
           <p className="text-lg text-muted-foreground">{pageDescription}</p>
           {searchQuery && (
             <p className="text-sm text-muted-foreground mt-2">
-              Found {initialBooks.length > 0 ? `${initialBooks.length}+` : "0"}{" "}
+              Found{" "}
+              {safeInitialBooks.length > 0
+                ? `${safeInitialBooks.length}+`
+                : "0"}{" "}
               books
             </p>
           )}
@@ -65,7 +71,7 @@ export default async function ShopPage({
         </div>
 
         <BookList
-          initialBooks={initialBooks.map((book) => ({
+          initialBooks={safeInitialBooks.map((book) => ({
             ...book,
             _id: book._id.toString(),
           }))}
