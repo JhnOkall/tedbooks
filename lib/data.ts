@@ -1,36 +1,17 @@
 /**
  * @file This module contains data-fetching functions for interacting with the
  * application's API endpoints. It utilizes Next.js's extended `fetch` API for
- * caching and revalidation strategies.
+ * caching and revalidation strategies, now with pagination support.
  */
 
-// --- MODIFICATION START ---
-// Import the frontend-facing types for better type safety in data-fetching functions.
 import { Book, Genre } from '@/types';
-// --- MODIFICATION END ---
 
 /**
  * Retrieves the base URL for API calls.
- * This utility function ensures that API requests are directed to the correct
- * host, whether in a local development environment or a deployed production environment.
- * It prioritizes the `NEXT_PUBLIC_BASE_URL` environment variable and falls back to localhost.
- * @returns {string} The base URL for the application.
  */
 function getBaseUrl(): string {
   return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 }
-
-// --- MODIFICATION START ---
-/**
- * A Note on API Endpoints:
- * For the following functions to work, your API endpoints (e.g., in `app/api/books/route.ts`)
- * must be updated to use Mongoose's `.populate('genre')` method when querying for books.
- * This will replace the genre's ObjectId with the full genre document.
- *
- * Example:
- * const books = await Book.find({ featured: true }).populate('genre');
- */
-// --- MODIFICATION END ---
 
 /**
  * Fetches an array of books that are marked as "featured".
@@ -41,7 +22,6 @@ function getBaseUrl(): string {
 export async function getFeaturedBooks(): Promise<Book[]> {
   const baseUrl = getBaseUrl();
   try {
-    // The API endpoint must populate the 'genre' field for this to work correctly.
     const res = await fetch(`${baseUrl}/api/books?featured=true`, {
       next: { revalidate: 3600 },
     });
@@ -59,26 +39,26 @@ export async function getFeaturedBooks(): Promise<Book[]> {
 }
 
 /**
- * Fetches all books, with optional filtering by search query or genre slug.
- * This fetch is not cached (`cache: 'no-store'`) to ensure that results
- * are always up-to-date.
+ * Fetches the first page of books for infinite scroll, with optional filtering by search query or genre slug.
+ * This fetch is not cached to ensure results are always up-to-date.
  *
  * @param {{ searchQuery?: string; genreSlug?: string }} params - Optional search and genre filters.
  * @returns {Promise<Book[]>} A promise that resolves to an array of books matching the criteria.
  */
-// --- MODIFICATION START ---
 export async function getAllBooks(params: {
   searchQuery?: string;
   genreSlug?: string;
 }): Promise<Book[]> {
   const { searchQuery, genreSlug } = params;
   const baseUrl = getBaseUrl();
-  const queryParams = new URLSearchParams();
+  const queryParams = new URLSearchParams({
+    page: '1',
+    limit: '12'
+  });
 
   if (searchQuery) {
     queryParams.append('search', searchQuery);
   }
-  // The API endpoint should be designed to find the genre by slug and then query books.
   if (genreSlug) {
     queryParams.append('genre', genreSlug);
   }
@@ -95,13 +75,70 @@ export async function getAllBooks(params: {
       return [];
     }
 
-    return res.json();
+    const data = await res.json();
+    
+    // Check if the response includes pagination info (when page parameter is used)
+    if (data.books) {
+      return data.books;
+    }
+    
+    // Fallback for responses without pagination wrapper
+    return data;
   } catch (error) {
     console.error('An error occurred in getAllBooks:', error);
     return [];
   }
 }
-// --- MODIFICATION END ---
+
+/**
+ * Fetches books with full pagination information.
+ * Useful for admin panels or when you need pagination metadata.
+ *
+ * @param {object} params - Parameters for fetching paginated books.
+ * @param {number} params.page - The page number to fetch.
+ * @param {number} params.limit - Number of books per page.
+ * @param {string} [params.searchQuery] - Optional search query.
+ * @param {string} [params.genreSlug] - Optional genre slug filter.
+ * @returns {Promise<{books: Book[], pagination: any}>} Paginated book results with metadata.
+ */
+export async function getBooksWithPagination(params: {
+  page: number;
+  limit: number;
+  searchQuery?: string;
+  genreSlug?: string;
+}): Promise<{ books: Book[]; pagination: any }> {
+  const { page, limit, searchQuery, genreSlug } = params;
+  const baseUrl = getBaseUrl();
+  const queryParams = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString()
+  });
+
+  if (searchQuery) {
+    queryParams.append('search', searchQuery);
+  }
+  if (genreSlug) {
+    queryParams.append('genre', genreSlug);
+  }
+
+  const url = `${baseUrl}/api/books?${queryParams.toString()}`;
+
+  try {
+    const res = await fetch(url, {
+      cache: 'no-store',
+    });
+
+    if (!res.ok) {
+      console.error(`Failed to fetch paginated books: ${res.statusText}`);
+      return { books: [], pagination: null };
+    }
+
+    return res.json();
+  } catch (error) {
+    console.error('An error occurred in getBooksWithPagination:', error);
+    return { books: [], pagination: null };
+  }
+}
 
 /**
  * Fetches a single book by its unique identifier.
@@ -113,7 +150,6 @@ export async function getAllBooks(params: {
 export async function getBookById(id: string): Promise<Book | null> {
   const baseUrl = getBaseUrl();
   try {
-    // The API endpoint must populate the 'genre' field.
     const res = await fetch(`${baseUrl}/api/books/${id}`, {
       next: { revalidate: 3600 },
     });
@@ -136,22 +172,21 @@ export async function getBookById(id: string): Promise<Book | null> {
 
 /**
  * Fetches a list of related books from the same genre, excluding the source book.
- * This function is now optimized to let the API handle filtering and limiting.
+ * This function is optimized to let the API handle filtering and limiting.
  *
- * @param {Book} book - The primary book object.
+ * @param {string} genreId - The genre ID to find related books for.
+ * @param {string} [excludeBookId] - Optional book ID to exclude from results.
  * @returns {Promise<Book[]>} A promise that resolves to an array of up to 4 related books.
  */
-// --- MODIFICATION START ---
 export async function getRelatedBooks(genreId: string, excludeBookId?: string): Promise<Book[]> {
   if (!genreId) return [];
 
   const baseUrl = getBaseUrl();
   try {
-    // API is enhanced to handle filtering by genre ID, excluding a specific book, and limiting results.
     const url = `${baseUrl}/api/books?genreId=${genreId}&exclude=${excludeBookId || ''}&limit=4`;
 
     const res = await fetch(url, {
-      next: { revalidate: 3600 }, // Cache related books for an hour
+      next: { revalidate: 3600 },
     });
 
     if (!res.ok) {
@@ -160,7 +195,7 @@ export async function getRelatedBooks(genreId: string, excludeBookId?: string): 
       );
       return [];
     }
-    // The client-side filtering and slicing is no longer needed.
+    
     return res.json();
   } catch (error) {
     console.error(
@@ -170,9 +205,6 @@ export async function getRelatedBooks(genreId: string, excludeBookId?: string): 
     return [];
   }
 }
-// --- MODIFICATION END ---
-
-// --- NEW FUNCTIONS FOR GENRES ---
 
 /**
  * Fetches all available genres from the API.
@@ -184,7 +216,6 @@ export async function getAllGenres(): Promise<Genre[]> {
   const baseUrl = getBaseUrl();
   try {
     const res = await fetch(`${baseUrl}/api/genres`, {
-      // Revalidate once a day (86400 seconds)
       next: { revalidate: 86400 },
     });
 
