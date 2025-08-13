@@ -53,7 +53,7 @@ export async function getAllBooks(params: {
   const baseUrl = getBaseUrl();
   const queryParams = new URLSearchParams({
     page: '1',
-    limit: '12'
+    limit: '10'
   });
 
   if (searchQuery) {

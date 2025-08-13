@@ -44,7 +44,7 @@ export function BookList({
 
   const [books, setBooks] = useState<Book[]>(safeInitialBooks);
   const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(safeInitialBooks.length === 12); // Assuming 12 books per page
+  const [hasMore, setHasMore] = useState(safeInitialBooks.length === 10); // Assuming 10 books per page
   const [page, setPage] = useState(1);
   const observerRef = useRef<HTMLDivElement>(null);
 
@@ -53,7 +53,7 @@ export function BookList({
     const safeBooksArray = Array.isArray(initialBooks) ? initialBooks : [];
     setBooks(safeBooksArray);
     setPage(1);
-    setHasMore(safeBooksArray.length === 12);
+    setHasMore(safeBooksArray.length === 10);
   }, [initialBooks, searchQuery, genreSlug]);
 
   // Function to load more books
@@ -64,7 +64,7 @@ export function BookList({
     try {
       const params = new URLSearchParams({
         page: (page + 1).toString(),
-        limit: "12",
+        limit: "10",
       });
 
       if (searchQuery) {
@@ -93,7 +93,7 @@ export function BookList({
         } else {
           setBooks((prev) => [...prev, ...newBooks]);
           setPage((prev) => prev + 1);
-          setHasMore(newBooks.length === 12);
+          setHasMore(newBooks.length === 10);
         }
       } else {
         console.error("Failed to fetch more books:", response.statusText);

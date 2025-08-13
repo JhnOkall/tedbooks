@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
     // Handle pagination
     if (page) {
       const pageNumber = parseInt(page, 10);
-      const pageSize = limit ? parseInt(limit, 10) : 12; // Default to 12 books per page
+      const pageSize = limit ? parseInt(limit, 10) : 10; // Default to 10 books per page
       
       if (!isNaN(pageNumber) && pageNumber > 0) {
         const skip = (pageNumber - 1) * pageSize;
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
     if (page) {
       const total = await Book.countDocuments(query);
       const pageNumber = parseInt(page, 10);
-      const pageSize = limit ? parseInt(limit, 10) : 12;
+      const pageSize = limit ? parseInt(limit, 10) : 10;
       
       return NextResponse.json({
         books,
